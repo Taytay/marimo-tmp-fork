@@ -3508,6 +3508,11 @@ components:
           items:
             type: string
           type: array
+        names:
+          items:
+            type: string
+          type: array
+          description: Optional cell names. When provided, frontend should update cell names.
         op:
           enum:
           - update-cell-codes

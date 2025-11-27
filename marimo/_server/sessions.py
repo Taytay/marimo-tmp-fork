@@ -1208,9 +1208,11 @@ class SessionFileChangeHandler:
             session.write_operation(Reload(), from_consumer_id=None)
             return
 
-        # Get the latest codes
-        codes = list(session.app_file_manager.app.cell_manager.codes())
-        cell_ids = list(session.app_file_manager.app.cell_manager.cell_ids())
+        # Get the latest codes and names
+        cell_manager = session.app_file_manager.app.cell_manager
+        codes = list(cell_manager.codes())
+        cell_ids = list(cell_manager.cell_ids())
+        names = list(cell_manager.names())
 
         LOGGER.info(
             f"File changed: {file_path}. num_cell_ids: {len(cell_ids)}, num_codes: {len(codes)}, changed_cell_ids: {changed_cell_ids}"
@@ -1236,6 +1238,19 @@ class SessionFileChangeHandler:
             changed_cell_ids_list = list(changed_cell_ids - deleted)
             cells = dict(zip(cell_ids, codes))
 
+            # Send cell codes and names to frontend immediately so it can
+            # update the display while cells are being executed.
+            # This ensures cell names are updated even when autorun is enabled.
+            session.write_operation(
+                UpdateCellCodes(
+                    cell_ids=cell_ids,
+                    codes=codes,
+                    code_is_stale=False,  # Will be run immediately
+                    names=names,
+                ),
+                from_consumer_id=None,
+            )
+
             session.put_control_request(
                 SyncGraphRequest(
                     cells=cells,
@@ -1255,6 +1270,7 @@ class SessionFileChangeHandler:
                     cell_ids=cell_ids,
                     codes=codes,
                     code_is_stale=True,
+                    names=names,
                 ),
                 from_consumer_id=None,
             )

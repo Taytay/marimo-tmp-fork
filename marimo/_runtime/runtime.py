@@ -1547,9 +1547,14 @@ class Kernel:
             if cell_id in self._uninstantiated_execution_requests:
                 del self._uninstantiated_execution_requests[cell_id]
 
-        # Use existing mutate_graph infrastructure to update the graph
-        self.mutate_graph(execution_requests, deletion_requests)
-        await self.run(execution_requests)
+        # Use mutate_graph to update the graph and get cells to run.
+        # mutate_graph returns the set of cells that need to run, including
+        # both the directly changed cells AND their stale descendants.
+        # We must use this return value directly rather than calling run(),
+        # because run() calls mutate_graph again, and the second call would
+        # see the cells as already cached and return an empty set.
+        cells_to_run = self.mutate_graph(execution_requests, deletion_requests)
+        await self._run_cells(cells_to_run)
 
     @kernel_tracer.start_as_current_span("run")
     async def run(

@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Note:** For comprehensive contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md). This file contains Claude-specific quick reference.
+
 ## Build, Lint, Test Commands
 
 ### First-time Setup
@@ -14,6 +16,10 @@ make fe && make py
 
 # Start development servers (backend on 2718, frontend on 3000)
 make dev
+
+# Optional: Install pre-commit hooks for automatic validation
+uvx pre-commit install
+# or: pixi run pre-commit install
 ```
 
 ### Common Development Commands
@@ -45,16 +51,18 @@ hatch run typecheck:check
 # Python tests
 make py-test
 # or run specific test:
-hatch run +py=3.12 test:test tests/path/to/test.py
+hatch run +py=3.13 test:test tests/path/to/test.py
 # or with optional dependencies:
-hatch run +py=3.12 test-optional:test tests/path/to/test.py
+hatch run +py=3.13 test-optional:test tests/path/to/test.py
 # or run only changed tests:
-hatch run +py=3.12 test:test --picked
+hatch run +py=3.13 test:test --picked
 
 # End-to-end tests (Playwright)
 make e2e
 # or interactively:
 cd frontend && pnpm playwright test --ui
+# or with debugger:
+cd frontend && pnpm playwright test --debug $FILENAME
 
 # Build docs
 make docs
@@ -75,6 +83,21 @@ cd frontend && pnpm dev
 # Frontend watch mode (slower, closer to production)
 cd frontend && pnpm build:watch
 ```
+
+**Important**: When running `pnpm dev`, the frontend is served from Vite dev server (not marimo server). You should run the marimo backend with `--headless` and `--no-token` to avoid interference. This is faster for development but not identical to production.
+
+## Contributing Checklist
+
+Before submitting a pull request:
+- Run `make check` (lint, typecheck, format)
+- Write and run tests (`make test`)
+- Build frontend if changed (`make fe`)
+- Read and sign the [CLA](https://marimo.io/cla) (required for first PR - sign by commenting: `I have read the CLA Document and I hereby sign the CLA`)
+
+**PR Labels:**
+- `test-all`: Runs all tests across unchanged files (not just changed files)
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for complete guidelines.
 
 ## Architecture Overview
 

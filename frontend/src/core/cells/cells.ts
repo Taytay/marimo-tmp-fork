@@ -794,12 +794,23 @@ const {
   },
   setCellCodes: (
     state,
-    action: { codes: string[]; ids: CellId[]; codeIsStale: boolean },
+    action: {
+      codes: string[];
+      ids: CellId[];
+      codeIsStale: boolean;
+      names?: string[];
+    },
   ) => {
     invariant(
       action.codes.length === action.ids.length,
       "Expected codes and ids to have the same length",
     );
+    if (action.names) {
+      invariant(
+        action.names.length === action.ids.length,
+        "Expected names and ids to have the same length",
+      );
+    }
 
     let nextState = { ...state };
 
@@ -807,15 +818,18 @@ const {
       cell,
       code,
       cellId,
+      name,
     }: {
       cell: CellData | undefined;
       code: string;
       cellId: CellId;
+      name?: string;
     }) => {
       if (!cell) {
         return createCell({
           id: cellId,
           code,
+          name: name ?? "",
           lastCodeRun: action.codeIsStale ? null : code,
           edited: action.codeIsStale && code.trim().length > 0,
         });
@@ -829,13 +843,15 @@ const {
         ? lastCodeRun.trim() !== code.trim()
         : Boolean(code);
 
-      // No change
+      // No change to code
       if (cell.code.trim() === code.trim()) {
         return {
           ...cell,
           code: code,
           edited,
           lastCodeRun,
+          // Update name if provided
+          ...(name !== undefined ? { name } : {}),
         };
       }
 
@@ -853,21 +869,33 @@ const {
         code: code,
         edited,
         lastCodeRun,
+        // Update name if provided
+        ...(name !== undefined ? { name } : {}),
       };
     };
 
-    for (const [cellId, code] of zip(action.ids, action.codes)) {
-      if (cellId === undefined || code === undefined) {
+    // Zip ids, codes, and optionally names
+    const items = action.names
+      ? action.ids.map((id, i) => ({
+          id,
+          code: action.codes[i],
+          name: action.names?.[i],
+        }))
+      : action.ids.map((id, i) => ({ id, code: action.codes[i] }));
+
+    for (const item of items) {
+      if (item.id === undefined || item.code === undefined) {
         continue;
       }
       nextState = {
         ...nextState,
         cellData: {
           ...nextState.cellData,
-          [cellId]: cellReducer({
-            cell: nextState.cellData[cellId],
-            code,
-            cellId,
+          [item.id]: cellReducer({
+            cell: nextState.cellData[item.id],
+            code: item.code,
+            cellId: item.id,
+            name: item.name,
           }),
         },
       };

@@ -685,6 +685,9 @@ class UpdateCellCodes(Op, tag="update-cell-codes"):
     # If true, this means the code was not run on the backend when updating
     # the cell codes.
     code_is_stale: bool
+    # Optional cell names - when provided, frontend should update cell names.
+    # This is used when cells are renamed (e.g., def _() -> def my_cell()).
+    names: Optional[list[str]] = None
 
 
 class SecretKeysResult(Op, tag="secret-keys-result"):

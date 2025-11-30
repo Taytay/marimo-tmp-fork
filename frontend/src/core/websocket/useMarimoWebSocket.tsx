@@ -276,6 +276,8 @@ export function useMarimoWebSocket(opts: {
           codes: msg.data.codes,
           ids: msg.data.cell_ids as CellId[],
           codeIsStale: msg.data.code_is_stale,
+          // Pass names if provided (for cell renames via file watcher)
+          names: msg.data.names,
         });
         return;
       case "update-cell-ids":

@@ -3,6 +3,7 @@
 import { startCase } from "lodash-es";
 import {
   Grid3x3Icon,
+  LayoutPanelTopIcon,
   ListIcon,
   PresentationIcon,
   SquareIcon,
@@ -75,6 +76,8 @@ export function getLayoutIcon(layoutType: LayoutType) {
       return Grid3x3Icon;
     case "slides":
       return PresentationIcon;
+    case "canvas":
+      return LayoutPanelTopIcon;
     default:
       logNever(layoutType);
       return SquareIcon;

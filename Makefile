@@ -54,11 +54,14 @@ marimo/_lsp: $(shell find packages/lsp)
 	./scripts/buildlsp.sh
 
 .PHONY: dev
+# Usage: make dev [WORKSPACE=/path/to/folder] [PORT=2718]
+WORKSPACE ?= /tmp
+PORT ?= 2718
 dev:
-	@echo "Starting development servers..."
+	@echo "Starting development servers (workspace: $(WORKSPACE), port: $(PORT))..."
 	@# Start both processes, with marimo in background
 	@(trap 'kill %1; exit' INT; \
-	uv run marimo edit --no-token --headless /tmp --port 2718 & \
+	uv run marimo edit --no-token --headless $(WORKSPACE) --port $(PORT) & \
 	pnpm dev)
 dev-sandbox:
 	@echo "Starting development servers..."

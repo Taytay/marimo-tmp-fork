@@ -64,8 +64,15 @@ export function createDependencyArrows(
   }
 
   // Batch create all arrows
+  const arrowIds: TLShapeId[] = [];
   for (const { fromShapeId, toShapeId } of arrowsToCreate) {
-    createArrowBetweenShapes(editor, fromShapeId, toShapeId);
+    const arrowId = createArrowBetweenShapes(editor, fromShapeId, toShapeId);
+    arrowIds.push(arrowId);
+  }
+
+  // Send all arrows to the back so they render behind cells
+  if (arrowIds.length > 0) {
+    editor.sendToBack(arrowIds);
   }
 }
 
@@ -109,12 +116,13 @@ export function createArrowBetweenShapes(
 
   const arrowId = createShapeId();
 
-  // Create the arrow shape
+  // Create the arrow shape (locked so it's not selectable)
   editor.createShape({
     id: arrowId,
     type: "arrow",
     x: startPoint.x,
     y: startPoint.y,
+    isLocked: true,
     props: {
       start: {
         x: 0,

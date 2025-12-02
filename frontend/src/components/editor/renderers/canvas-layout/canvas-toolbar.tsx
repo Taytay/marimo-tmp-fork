@@ -53,7 +53,7 @@ export const CanvasToolbar: React.FC<CanvasToolbarProps> = memo(
     const hasMultipleSelection = selectedCount > 1;
 
     return (
-      <div className="absolute top-2 left-2 z-50 flex items-center gap-1 bg-background/90 backdrop-blur-sm border rounded-lg p-1 shadow-sm">
+      <div className="absolute top-14 left-2 z-50 flex items-center gap-1 bg-background/90 backdrop-blur-sm border rounded-lg p-1 shadow-sm">
         {/* Zoom controls */}
         <div className="flex items-center gap-0.5 pr-2 border-r">
           <Tooltip content="Zoom in">

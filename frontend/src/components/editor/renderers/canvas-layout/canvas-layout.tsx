@@ -12,7 +12,7 @@ import { createShapeId, type Editor, type TLShapeId, Tldraw } from "tldraw";
 import "tldraw/tldraw.css";
 
 import { useRunCells } from "@/components/editor/cell/useRunCells";
-import { useCellActions } from "@/core/cells/cells";
+import { useCellActions, useCellIds } from "@/core/cells/cells";
 import type { CellId } from "@/core/cells/ids";
 import { CellId as CellIdUtils } from "@/core/cells/ids";
 import type { CellData, CellRuntimeState } from "@/core/cells/types";
@@ -29,6 +29,7 @@ import {
   ReadModeContext,
 } from "./cell-shape-util";
 import { updateDependencyArrows } from "./dependency-arrows";
+import { createColumnFrames } from "./frame-utils";
 import {
   alignShapesLeft,
   alignShapesTop,
@@ -55,8 +56,11 @@ const customShapeUtils = [CellShapeUtil];
 export const CanvasLayoutRenderer: React.FC<Props> = memo(
   ({ layout, setLayout, cells, mode }) => {
     const variables = useVariables();
+    const cellIds = useCellIds();
     const editorRef = useRef<Editor | null>(null);
     const cellShapeIdsRef = useRef<Map<CellId, TLShapeId>>(new Map());
+    const columnFrameIdsRef = useRef<Map<number, TLShapeId>>(new Map());
+    const headerFrameIdsRef = useRef<Map<CellId, TLShapeId>>(new Map());
     const isInitializedRef = useRef(false);
     const [selectedCount, setSelectedCount] = useState(0);
     const { createNewCell, focusCell } = useCellActions();
@@ -276,6 +280,20 @@ export const CanvasLayoutRenderer: React.FC<Props> = memo(
         // Initialize cell shapes if this is the first mount
         if (!isInitializedRef.current) {
           initializeCellShapes(editor, cells, layout, cellShapeIdsRef.current);
+
+          // Create column and header frames
+          const columns = cellIds.getColumns();
+          if (columns.length > 0) {
+            const { columnFrameIds, headerFrameIds } = createColumnFrames(
+              editor,
+              columns,
+              cellDataMap,
+              cellShapeIdsRef.current,
+            );
+            columnFrameIdsRef.current = columnFrameIds;
+            headerFrameIdsRef.current = headerFrameIds;
+          }
+
           isInitializedRef.current = true;
         }
 
@@ -300,25 +318,31 @@ export const CanvasLayoutRenderer: React.FC<Props> = memo(
           }
         };
 
-        // Subscribe to store changes
-        const unsubscribe = editor.store.listen(
-          (entry) => {
+        // Subscribe to document changes (shape positions, etc.)
+        const unsubscribeDocument = editor.store.listen(
+          () => {
             handleChange();
-            if (entry.changes.updated) {
-              handleSelectionChange();
-            }
           },
           { source: "user", scope: "document" },
+        );
+
+        // Subscribe to session changes (selection, etc.)
+        const unsubscribeSession = editor.store.listen(
+          () => {
+            handleSelectionChange();
+          },
+          { source: "user", scope: "session" },
         );
 
         // Initial selection count
         handleSelectionChange();
 
         return () => {
-          unsubscribe();
+          unsubscribeDocument();
+          unsubscribeSession();
         };
       },
-      [cells, layout, setLayout, variables, isReadMode],
+      [cells, cellIds, cellDataMap, layout, setLayout, variables, isReadMode],
     );
 
     // Update cell shapes when cells change

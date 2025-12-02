@@ -19,7 +19,7 @@ import type { Variables } from "@/core/variables/types";
 export function createDependencyArrows(
   editor: Editor,
   variables: Variables,
-  cellShapeIds: Map<CellId, TLShapeId>
+  cellShapeIds: Map<CellId, TLShapeId>,
 ): void {
   const visited = new Set<string>();
   const arrowsToCreate: Array<{
@@ -79,7 +79,7 @@ export function createDependencyArrows(
 export function createArrowBetweenShapes(
   editor: Editor,
   startShapeId: TLShapeId,
-  endShapeId: TLShapeId
+  endShapeId: TLShapeId,
 ): TLShapeId {
   const startShape = editor.getShape(startShapeId);
   const endShape = editor.getShape(endShapeId);
@@ -193,7 +193,7 @@ export function clearDependencyArrows(editor: Editor): void {
 export function updateDependencyArrows(
   editor: Editor,
   variables: Variables,
-  cellShapeIds: Map<CellId, TLShapeId>
+  cellShapeIds: Map<CellId, TLShapeId>,
 ): void {
   // Clear existing arrows and create new ones
   clearDependencyArrows(editor);

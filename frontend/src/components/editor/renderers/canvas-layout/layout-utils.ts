@@ -27,7 +27,7 @@ const DEFAULT_LAYOUT_OPTIONS: LayoutOptions = {
  */
 export function buildDependencyGraph(
   variables: Variables,
-  cellIds: Set<CellId>
+  cellIds: Set<CellId>,
 ): Map<CellId, Set<CellId>> {
   const dependencies = new Map<CellId, Set<CellId>>();
 
@@ -46,8 +46,12 @@ export function buildDependencyGraph(
 
     for (const producerId of declaredBy) {
       for (const consumerId of usedBy) {
-        if (producerId === consumerId) continue;
-        if (!cellIds.has(producerId) || !cellIds.has(consumerId)) continue;
+        if (producerId === consumerId) {
+          continue;
+        }
+        if (!cellIds.has(producerId) || !cellIds.has(consumerId)) {
+          continue;
+        }
 
         // consumerId depends on producerId
         const deps = dependencies.get(consumerId);
@@ -68,7 +72,7 @@ export function buildDependencyGraph(
  */
 export function computeExecutionLevels(
   cellIds: CellId[],
-  dependencies: Map<CellId, Set<CellId>>
+  dependencies: Map<CellId, Set<CellId>>,
 ): Map<CellId, number> {
   const levels = new Map<CellId, number>();
   const visited = new Set<CellId>();
@@ -114,7 +118,7 @@ export function computeExecutionLevels(
  */
 export function groupByLevel(
   cellIds: CellId[],
-  levels: Map<CellId, number>
+  levels: Map<CellId, number>,
 ): CellId[][] {
   const maxLevel = Math.max(...levels.values(), 0);
   const groups: CellId[][] = Array.from({ length: maxLevel + 1 }, () => []);
@@ -135,7 +139,7 @@ export function layoutShapesByDependency(
   shapeIds: TLShapeId[],
   variables: Variables,
   cellShapeIds: Map<CellId, TLShapeId>,
-  options: Partial<LayoutOptions> = {}
+  options: Partial<LayoutOptions> = {},
 ): void {
   const opts = { ...DEFAULT_LAYOUT_OPTIONS, ...options };
 
@@ -150,16 +154,18 @@ export function layoutShapesByDependency(
     }
   }
 
-  if (selectedCellIds.length === 0) return;
+  if (selectedCellIds.length === 0) {
+    return;
+  }
 
   // Build dependency graph for selected cells
   const dependencies = buildDependencyGraph(
     variables,
-    new Set(selectedCellIds)
+    new Set(selectedCellIds),
   );
 
   // Compute execution levels (used by dagre for ranking)
-  const dependencies_for_dagre = dependencies;
+  const dependenciesForDagre = dependencies;
 
   // Calculate positions using dagre for proper layout
   const g = new graphlib.Graph();
@@ -174,10 +180,14 @@ export function layoutShapesByDependency(
   // Add nodes
   for (const cellId of selectedCellIds) {
     const shapeId = cellShapeIds.get(cellId);
-    if (!shapeId) continue;
+    if (!shapeId) {
+      continue;
+    }
 
     const shape = editor.getShape(shapeId) as CellShape | undefined;
-    if (!shape) continue;
+    if (!shape) {
+      continue;
+    }
 
     g.setNode(cellId, {
       width: shape.props.w,
@@ -186,7 +196,7 @@ export function layoutShapesByDependency(
   }
 
   // Add edges
-  for (const [cellId, deps] of dependencies_for_dagre.entries()) {
+  for (const [cellId, deps] of dependenciesForDagre.entries()) {
     for (const depId of deps) {
       if (selectedCellIds.includes(depId)) {
         g.setEdge(depId, cellId);
@@ -213,13 +223,19 @@ export function layoutShapesByDependency(
 
   for (const cellId of selectedCellIds) {
     const shapeId = cellShapeIds.get(cellId);
-    if (!shapeId) continue;
+    if (!shapeId) {
+      continue;
+    }
 
     const node = g.node(cellId);
-    if (!node) continue;
+    if (!node) {
+      continue;
+    }
 
     const shape = editor.getShape(shapeId) as CellShape | undefined;
-    if (!shape) continue;
+    if (!shape) {
+      continue;
+    }
 
     // Position from dagre is center-based, convert to top-left
     updates.push({
@@ -236,7 +252,7 @@ export function layoutShapesByDependency(
       type: "cell",
       x,
       y,
-    }))
+    })),
   );
 }
 
@@ -246,15 +262,17 @@ export function layoutShapesByDependency(
 export function layoutShapesInGrid(
   editor: Editor,
   shapeIds: TLShapeId[],
-  cellShapeIds: Map<CellId, TLShapeId>,
-  columns: number = 3
+  _cellShapeIds: Map<CellId, TLShapeId>,
+  columns: number = 3,
 ): void {
   // Get shapes with their current order
   const shapes = shapeIds
     .map((id) => editor.getShape(id) as CellShape | undefined)
     .filter((s): s is CellShape => s !== undefined);
 
-  if (shapes.length === 0) return;
+  if (shapes.length === 0) {
+    return;
+  }
 
   // Find starting position
   const minX = Math.min(...shapes.map((s) => s.x));
@@ -294,7 +312,7 @@ export function layoutShapesInGrid(
       type: "cell",
       x,
       y,
-    }))
+    })),
   );
 }
 
@@ -303,14 +321,16 @@ export function layoutShapesInGrid(
  */
 export function layoutShapesVertically(
   editor: Editor,
-  shapeIds: TLShapeId[]
+  shapeIds: TLShapeId[],
 ): void {
   const shapes = shapeIds
     .map((id) => editor.getShape(id) as CellShape | undefined)
     .filter((s): s is CellShape => s !== undefined)
     .sort((a, b) => a.y - b.y); // Maintain relative order
 
-  if (shapes.length === 0) return;
+  if (shapes.length === 0) {
+    return;
+  }
 
   const minX = Math.min(...shapes.map((s) => s.x));
   const minY = Math.min(...shapes.map((s) => s.y));
@@ -333,7 +353,7 @@ export function layoutShapesVertically(
       type: "cell",
       x,
       y,
-    }))
+    })),
   );
 }
 
@@ -342,14 +362,16 @@ export function layoutShapesVertically(
  */
 export function layoutShapesHorizontally(
   editor: Editor,
-  shapeIds: TLShapeId[]
+  shapeIds: TLShapeId[],
 ): void {
   const shapes = shapeIds
     .map((id) => editor.getShape(id) as CellShape | undefined)
     .filter((s): s is CellShape => s !== undefined)
     .sort((a, b) => a.x - b.x); // Maintain relative order
 
-  if (shapes.length === 0) return;
+  if (shapes.length === 0) {
+    return;
+  }
 
   const minX = Math.min(...shapes.map((s) => s.x));
   const minY = Math.min(...shapes.map((s) => s.y));
@@ -372,7 +394,7 @@ export function layoutShapesHorizontally(
       type: "cell",
       x,
       y,
-    }))
+    })),
   );
 }
 
@@ -384,7 +406,9 @@ export function alignShapesLeft(editor: Editor, shapeIds: TLShapeId[]): void {
     .map((id) => editor.getShape(id) as CellShape | undefined)
     .filter((s): s is CellShape => s !== undefined);
 
-  if (shapes.length === 0) return;
+  if (shapes.length === 0) {
+    return;
+  }
 
   const minX = Math.min(...shapes.map((s) => s.x));
 
@@ -393,7 +417,7 @@ export function alignShapesLeft(editor: Editor, shapeIds: TLShapeId[]): void {
       id: shape.id,
       type: "cell",
       x: minX,
-    }))
+    })),
   );
 }
 
@@ -405,7 +429,9 @@ export function alignShapesTop(editor: Editor, shapeIds: TLShapeId[]): void {
     .map((id) => editor.getShape(id) as CellShape | undefined)
     .filter((s): s is CellShape => s !== undefined);
 
-  if (shapes.length === 0) return;
+  if (shapes.length === 0) {
+    return;
+  }
 
   const minY = Math.min(...shapes.map((s) => s.y));
 
@@ -414,6 +440,6 @@ export function alignShapesTop(editor: Editor, shapeIds: TLShapeId[]): void {
       id: shape.id,
       type: "cell",
       y: minY,
-    }))
+    })),
   );
 }

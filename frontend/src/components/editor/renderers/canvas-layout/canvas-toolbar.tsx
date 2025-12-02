@@ -1,19 +1,18 @@
 /* Copyright 2024 Marimo. All rights reserved. */
 
-import React, { memo } from "react";
 import {
-  GitBranch,
-  Rows3,
-  AlignStartVertical,
   AlignStartHorizontal,
-  ZoomIn,
-  ZoomOut,
-  Maximize,
+  AlignStartVertical,
   ArrowDownToLine,
   ArrowRightToLine,
+  GitBranch,
+  Maximize,
+  Rows3,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
+import React, { memo } from "react";
 import { Button } from "@/components/ui/button";
-import { Tooltip } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/utils/cn";
 
 export interface CanvasToolbarProps {
@@ -96,7 +96,7 @@ export const CanvasToolbar: React.FC<CanvasToolbarProps> = memo(
               size="sm"
               className={cn(
                 "h-8 gap-1.5",
-                !hasMultipleSelection && "opacity-50"
+                !hasMultipleSelection && "opacity-50",
               )}
               disabled={!hasMultipleSelection}
             >
@@ -138,7 +138,7 @@ export const CanvasToolbar: React.FC<CanvasToolbarProps> = memo(
               size="sm"
               className={cn(
                 "h-8 gap-1.5",
-                !hasMultipleSelection && "opacity-50"
+                !hasMultipleSelection && "opacity-50",
               )}
               disabled={!hasMultipleSelection}
             >
@@ -166,7 +166,7 @@ export const CanvasToolbar: React.FC<CanvasToolbarProps> = memo(
         )}
       </div>
     );
-  }
+  },
 );
 
 CanvasToolbar.displayName = "CanvasToolbar";

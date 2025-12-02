@@ -1,26 +1,28 @@
 /* Copyright 2024 Marimo. All rights reserved. */
 
+import {
+  ChevronDownIcon,
+  ChevronUpIcon,
+  PlayIcon,
+  PlusIcon,
+} from "lucide-react";
 import React, { memo, useState } from "react";
 import {
   BaseBoxShapeUtil,
   HTMLContainer,
+  type RecordProps,
+  resizeBox,
   T,
   type TLBaseShape,
-  type RecordProps,
   type TLResizeInfo,
-  resizeBox,
 } from "tldraw";
-import { PlusIcon, PlayIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
+import { TinyCode } from "@/components/editor/cell/TinyCode";
+import { OutputArea } from "@/components/editor/Output";
+import { outputIsLoading, outputIsStale } from "@/core/cells/cell";
 import type { CellId } from "@/core/cells/ids";
 import type { CellData, CellRuntimeState } from "@/core/cells/types";
-import { OutputArea } from "@/components/editor/Output";
-import { TinyCode } from "@/components/editor/cell/TinyCode";
-import { outputIsLoading, outputIsStale } from "@/core/cells/cell";
 import { cn } from "@/utils/cn";
-import {
-  DEFAULT_CELL_WIDTH,
-  DEFAULT_CELL_HEIGHT,
-} from "./types";
+import { DEFAULT_CELL_HEIGHT, DEFAULT_CELL_WIDTH } from "./types";
 
 /**
  * Custom shape props for a marimo cell on the canvas.
@@ -67,11 +69,24 @@ export interface CanvasCellActions {
 }
 
 export const CellActionsContext = React.createContext<CanvasCellActions>({
-  onRun: () => {},
-  onDelete: () => {},
-  onFocus: () => {},
-  onAddCell: () => {},
+  onRun: () => {
+    // noop
+  },
+  onDelete: () => {
+    // noop
+  },
+  onFocus: () => {
+    // noop
+  },
+  onAddCell: () => {
+    // noop
+  },
 });
+
+/**
+ * Context for read mode state (app view vs edit view).
+ */
+export const ReadModeContext = React.createContext<boolean>(false);
 
 /**
  * Shape utility for rendering marimo cells in TLDraw canvas.
@@ -134,14 +149,7 @@ export class CellShapeUtil extends BaseBoxShapeUtil<CellShape> {
   }
 
   override indicator(shape: CellShape) {
-    return (
-      <rect
-        width={shape.props.w}
-        height={shape.props.h}
-        rx={8}
-        ry={8}
-      />
-    );
+    return <rect width={shape.props.w} height={shape.props.h} rx={8} ry={8} />;
   }
 }
 
@@ -173,7 +181,7 @@ const AddCellButton: React.FC<{
           "bg-primary/80 hover:bg-primary text-primary-foreground",
           "shadow-sm hover:shadow-md transition-all",
           "opacity-0 group-hover:opacity-100",
-          "hover:scale-110"
+          "hover:scale-110",
         )}
         title={`Add cell ${position}`}
       >
@@ -195,6 +203,7 @@ const CellShapeContent: React.FC<{
 }> = memo(({ cellId, width, height, isSelected }) => {
   const cellDataMap = React.useContext(CellDataContext);
   const actions = React.useContext(CellActionsContext);
+  const isReadMode = React.useContext(ReadModeContext);
   const cell = cellDataMap.get(cellId);
   const [isCodeCollapsed, setIsCodeCollapsed] = useState(false);
 
@@ -219,7 +228,7 @@ const CellShapeContent: React.FC<{
       runStartTimestamp: cell.runStartTimestamp,
       staleInputs: cell.staleInputs,
     },
-    false
+    false,
   );
   const loading = outputIsLoading(cell.status);
   const hasOutput = cell.output !== null && cell.output.data !== "";
@@ -231,65 +240,95 @@ const CellShapeContent: React.FC<{
         "group relative flex flex-col bg-background border rounded-lg overflow-visible h-full shadow-sm transition-shadow",
         isSelected && "ring-2 ring-primary shadow-md",
         hasError && "border-destructive",
-        cell.staleInputs && "border-warning"
+        cell.staleInputs && "border-warning",
       )}
       style={{ width, height }}
     >
-      {/* Add cell buttons */}
-      <AddCellButton position="above" onClick={() => actions.onAddCell(cellId, "above")} />
-      <AddCellButton position="below" onClick={() => actions.onAddCell(cellId, "below")} />
-      <AddCellButton position="left" onClick={() => actions.onAddCell(cellId, "left")} />
-      <AddCellButton position="right" onClick={() => actions.onAddCell(cellId, "right")} />
+      {/* Add cell buttons - only in edit mode */}
+      {!isReadMode && (
+        <>
+          <AddCellButton
+            position="above"
+            onClick={() => actions.onAddCell(cellId, "above")}
+          />
+          <AddCellButton
+            position="below"
+            onClick={() => actions.onAddCell(cellId, "below")}
+          />
+          <AddCellButton
+            position="left"
+            onClick={() => actions.onAddCell(cellId, "left")}
+          />
+          <AddCellButton
+            position="right"
+            onClick={() => actions.onAddCell(cellId, "right")}
+          />
+        </>
+      )}
 
       {/* Cell content wrapper with overflow hidden */}
       <div className="flex flex-col h-full overflow-hidden rounded-lg">
-        {/* Cell Header */}
-        <div className="flex items-center justify-between px-3 py-1.5 border-b bg-muted/30 shrink-0">
+        {/* Cell Header - minimal in read mode */}
+        <div
+          className={cn(
+            "flex items-center justify-between px-3 shrink-0",
+            isReadMode ? "py-1" : "py-1.5 border-b bg-muted/30",
+          )}
+        >
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsCodeCollapsed(!isCodeCollapsed);
-              }}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {isCodeCollapsed ? (
-                <ChevronDownIcon className="w-4 h-4" />
-              ) : (
-                <ChevronUpIcon className="w-4 h-4" />
-              )}
-            </button>
-            <span className="text-xs font-medium text-muted-foreground">
-              {cell.name || `Cell`}
-            </span>
+            {/* Code toggle - only in edit mode */}
+            {!isReadMode && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsCodeCollapsed(!isCodeCollapsed);
+                }}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {isCodeCollapsed ? (
+                  <ChevronDownIcon className="w-4 h-4" />
+                ) : (
+                  <ChevronUpIcon className="w-4 h-4" />
+                )}
+              </button>
+            )}
+            {/* Only show cell name if it has a custom name */}
+            {cell.name && (
+              <span className="text-xs font-medium text-muted-foreground">
+                {cell.name}
+              </span>
+            )}
             {cell.status === "running" && (
               <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
             )}
             {cell.status === "queued" && (
               <span className="w-2 h-2 bg-yellow-500 rounded-full" />
             )}
-            {cell.staleInputs && (
+            {!isReadMode && cell.staleInputs && (
               <span className="text-xs text-warning">stale</span>
             )}
           </div>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              className="flex items-center gap-1 text-xs px-2 py-0.5 bg-primary/10 hover:bg-primary/20 text-primary rounded transition-colors"
-              onClick={(e) => {
-                e.stopPropagation();
-                actions.onRun(cellId);
-              }}
-            >
-              <PlayIcon className="w-3 h-3" />
-              Run
-            </button>
-          </div>
+          {/* Run button - only in edit mode */}
+          {!isReadMode && (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                className="flex items-center gap-1 text-xs px-2 py-0.5 bg-primary/10 hover:bg-primary/20 text-primary rounded transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  actions.onRun(cellId);
+                }}
+              >
+                <PlayIcon className="w-3 h-3" />
+                Run
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Code Section */}
-        {!isCodeCollapsed && (
+        {/* Code Section - only in edit mode */}
+        {!isReadMode && !isCodeCollapsed && (
           <div
             className="flex-none border-b overflow-hidden cursor-pointer"
             style={{ maxHeight: Math.min(150, height * 0.4) }}

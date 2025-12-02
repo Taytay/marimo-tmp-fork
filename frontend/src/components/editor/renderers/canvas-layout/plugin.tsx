@@ -6,16 +6,12 @@ import { Logger } from "@/utils/Logger";
 import type { ICellRendererPlugin } from "../types";
 import { CanvasLayoutRenderer } from "./canvas-layout";
 import type {
-  CanvasLayout,
   CanvasCellPosition,
+  CanvasLayout,
   SerializedCanvasLayout,
   SerializedCanvasLayoutCell,
 } from "./types";
-import {
-  DEFAULT_CELL_WIDTH,
-  DEFAULT_CELL_HEIGHT,
-  CELL_SPACING,
-} from "./types";
+import { CELL_SPACING, DEFAULT_CELL_HEIGHT, DEFAULT_CELL_WIDTH } from "./types";
 
 /**
  * Plugin definition for the canvas layout.
@@ -33,7 +29,7 @@ export const CanvasLayoutPlugin: ICellRendererPlugin<
         position: z
           .tuple([z.number(), z.number(), z.number(), z.number()])
           .nullable(),
-      })
+      }),
     ),
   }),
 
@@ -46,7 +42,7 @@ export const CanvasLayoutPlugin: ICellRendererPlugin<
 
     if (serialized.cells.length !== cells.length) {
       Logger.warn(
-        "Number of cells in canvas layout does not match number of cells in notebook"
+        "Number of cells in canvas layout does not match number of cells in notebook",
       );
     }
 

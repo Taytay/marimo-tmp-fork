@@ -90,7 +90,7 @@ export const CanvasToolbar: React.FC<CanvasToolbarProps> = memo(
 
         {/* Layout dropdown */}
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+          <DropdownMenuTrigger asChild={true}>
             <Button
               variant="ghost"
               size="sm"
@@ -132,7 +132,7 @@ export const CanvasToolbar: React.FC<CanvasToolbarProps> = memo(
 
         {/* Align dropdown */}
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+          <DropdownMenuTrigger asChild={true}>
             <Button
               variant="ghost"
               size="sm"
@@ -161,7 +161,7 @@ export const CanvasToolbar: React.FC<CanvasToolbarProps> = memo(
         {/* Selection info */}
         {hasSelection && (
           <div className="pl-2 border-l text-xs text-muted-foreground">
-            {selectedCount} cell{selectedCount !== 1 ? "s" : ""} selected
+            {selectedCount} cell{selectedCount === 1 ? "" : "s"} selected
           </div>
         )}
       </div>

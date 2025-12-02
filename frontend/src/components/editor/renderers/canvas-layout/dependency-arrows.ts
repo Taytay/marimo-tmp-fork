@@ -22,11 +22,11 @@ export function createDependencyArrows(
   cellShapeIds: Map<CellId, TLShapeId>,
 ): void {
   const visited = new Set<string>();
-  const arrowsToCreate: Array<{
+  const arrowsToCreate: {
     fromShapeId: TLShapeId;
     toShapeId: TLShapeId;
     variableName: string;
-  }> = [];
+  }[] = [];
 
   for (const variable of Object.values(variables)) {
     // Skip marimo module (likely every cell uses it)

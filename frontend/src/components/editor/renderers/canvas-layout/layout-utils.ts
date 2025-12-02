@@ -184,14 +184,14 @@ export function layoutShapesByDependency(
       continue;
     }
 
-    const shape = editor.getShape(shapeId) as CellShape | undefined;
+    const shape = editor.getShape(shapeId);
     if (!shape) {
       continue;
     }
 
     g.setNode(cellId, {
-      width: shape.props.w,
-      height: shape.props.h,
+      width: (shape.props as { w: number }).w,
+      height: (shape.props as { h: number }).h,
     });
   }
 
@@ -232,7 +232,7 @@ export function layoutShapesByDependency(
       continue;
     }
 
-    const shape = editor.getShape(shapeId) as CellShape | undefined;
+    const shape = editor.getShape(shapeId);
     if (!shape) {
       continue;
     }
@@ -240,8 +240,8 @@ export function layoutShapesByDependency(
     // Position from dagre is center-based, convert to top-left
     updates.push({
       id: shapeId,
-      x: minX + node.x - shape.props.w / 2,
-      y: minY + node.y - shape.props.h / 2,
+      x: minX + node.x - (shape.props as { w: number }).w / 2,
+      y: minY + node.y - (shape.props as { h: number }).h / 2,
     });
   }
 
@@ -263,11 +263,11 @@ export function layoutShapesInGrid(
   editor: Editor,
   shapeIds: TLShapeId[],
   _cellShapeIds: Map<CellId, TLShapeId>,
-  columns: number = 3,
+  columns = 3,
 ): void {
   // Get shapes with their current order
   const shapes = shapeIds
-    .map((id) => editor.getShape(id) as CellShape | undefined)
+    .map((id) => editor.getShape(id))
     .filter((s): s is CellShape => s !== undefined);
 
   if (shapes.length === 0) {
@@ -324,7 +324,7 @@ export function layoutShapesVertically(
   shapeIds: TLShapeId[],
 ): void {
   const shapes = shapeIds
-    .map((id) => editor.getShape(id) as CellShape | undefined)
+    .map((id) => editor.getShape(id))
     .filter((s): s is CellShape => s !== undefined)
     .sort((a, b) => a.y - b.y); // Maintain relative order
 
@@ -365,7 +365,7 @@ export function layoutShapesHorizontally(
   shapeIds: TLShapeId[],
 ): void {
   const shapes = shapeIds
-    .map((id) => editor.getShape(id) as CellShape | undefined)
+    .map((id) => editor.getShape(id))
     .filter((s): s is CellShape => s !== undefined)
     .sort((a, b) => a.x - b.x); // Maintain relative order
 
@@ -403,7 +403,7 @@ export function layoutShapesHorizontally(
  */
 export function alignShapesLeft(editor: Editor, shapeIds: TLShapeId[]): void {
   const shapes = shapeIds
-    .map((id) => editor.getShape(id) as CellShape | undefined)
+    .map((id) => editor.getShape(id))
     .filter((s): s is CellShape => s !== undefined);
 
   if (shapes.length === 0) {
@@ -426,7 +426,7 @@ export function alignShapesLeft(editor: Editor, shapeIds: TLShapeId[]): void {
  */
 export function alignShapesTop(editor: Editor, shapeIds: TLShapeId[]): void {
   const shapes = shapeIds
-    .map((id) => editor.getShape(id) as CellShape | undefined)
+    .map((id) => editor.getShape(id))
     .filter((s): s is CellShape => s !== undefined);
 
   if (shapes.length === 0) {

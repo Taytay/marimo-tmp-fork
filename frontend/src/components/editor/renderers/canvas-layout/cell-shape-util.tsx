@@ -1,6 +1,6 @@
 /* Copyright 2024 Marimo. All rights reserved. */
 
-import React, { memo } from "react";
+import React, { memo, useState } from "react";
 import {
   BaseBoxShapeUtil,
   HTMLContainer,
@@ -10,6 +10,7 @@ import {
   type TLResizeInfo,
   resizeBox,
 } from "tldraw";
+import { PlusIcon, PlayIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import type { CellId } from "@/core/cells/ids";
 import type { CellData, CellRuntimeState } from "@/core/cells/types";
 import { OutputArea } from "@/components/editor/Output";
@@ -51,16 +52,25 @@ export const CellDataContext = React.createContext<
 >(new Map());
 
 /**
+ * Direction for adding a new cell relative to an existing cell.
+ */
+export type AddCellDirection = "above" | "below" | "left" | "right";
+
+/**
  * Context for providing cell actions.
  */
-export interface CellActions {
+export interface CanvasCellActions {
   onRun: (cellId: CellId) => void;
+  onDelete: (cellId: CellId) => void;
   onFocus: (cellId: CellId) => void;
+  onAddCell: (cellId: CellId, direction: AddCellDirection) => void;
 }
 
-export const CellActionsContext = React.createContext<CellActions>({
+export const CellActionsContext = React.createContext<CanvasCellActions>({
   onRun: () => {},
+  onDelete: () => {},
   onFocus: () => {},
+  onAddCell: () => {},
 });
 
 /**
@@ -136,6 +146,45 @@ export class CellShapeUtil extends BaseBoxShapeUtil<CellShape> {
 }
 
 /**
+ * Add cell button component for the cell shape.
+ */
+const AddCellButton: React.FC<{
+  position: AddCellDirection;
+  onClick: () => void;
+}> = memo(({ position, onClick }) => {
+  const positionStyles: Record<AddCellDirection, string> = {
+    above: "top-0 left-1/2 -translate-x-1/2 -translate-y-full pb-1",
+    below: "bottom-0 left-1/2 -translate-x-1/2 translate-y-full pt-1",
+    left: "left-0 top-1/2 -translate-x-full -translate-y-1/2 pr-1",
+    right: "right-0 top-1/2 translate-x-full -translate-y-1/2 pl-1",
+  };
+
+  return (
+    <div className={cn("absolute z-10", positionStyles[position])}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+        className={cn(
+          "flex items-center justify-center",
+          "w-5 h-5 rounded-full",
+          "bg-primary/80 hover:bg-primary text-primary-foreground",
+          "shadow-sm hover:shadow-md transition-all",
+          "opacity-0 group-hover:opacity-100",
+          "hover:scale-110"
+        )}
+        title={`Add cell ${position}`}
+      >
+        <PlusIcon className="w-3 h-3" strokeWidth={3} />
+      </button>
+    </div>
+  );
+});
+AddCellButton.displayName = "AddCellButton";
+
+/**
  * The inner content of a cell shape that renders the actual cell.
  */
 const CellShapeContent: React.FC<{
@@ -147,6 +196,7 @@ const CellShapeContent: React.FC<{
   const cellDataMap = React.useContext(CellDataContext);
   const actions = React.useContext(CellActionsContext);
   const cell = cellDataMap.get(cellId);
+  const [isCodeCollapsed, setIsCodeCollapsed] = useState(false);
 
   if (!cell) {
     return (
@@ -178,59 +228,103 @@ const CellShapeContent: React.FC<{
   return (
     <div
       className={cn(
-        "flex flex-col bg-background border rounded-lg overflow-hidden h-full shadow-sm transition-shadow",
+        "group relative flex flex-col bg-background border rounded-lg overflow-visible h-full shadow-sm transition-shadow",
         isSelected && "ring-2 ring-primary shadow-md",
         hasError && "border-destructive",
         cell.staleInputs && "border-warning"
       )}
       style={{ width, height }}
-      onDoubleClick={() => actions.onFocus(cellId)}
     >
-      {/* Cell Header */}
-      <div className="flex items-center justify-between px-3 py-1.5 border-b bg-muted/30 shrink-0">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-muted-foreground">
-            {cell.name || `Cell`}
-          </span>
-          {cell.status === "running" && (
-            <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-          )}
-          {cell.status === "queued" && (
-            <span className="w-2 h-2 bg-yellow-500 rounded-full" />
-          )}
+      {/* Add cell buttons */}
+      <AddCellButton position="above" onClick={() => actions.onAddCell(cellId, "above")} />
+      <AddCellButton position="below" onClick={() => actions.onAddCell(cellId, "below")} />
+      <AddCellButton position="left" onClick={() => actions.onAddCell(cellId, "left")} />
+      <AddCellButton position="right" onClick={() => actions.onAddCell(cellId, "right")} />
+
+      {/* Cell content wrapper with overflow hidden */}
+      <div className="flex flex-col h-full overflow-hidden rounded-lg">
+        {/* Cell Header */}
+        <div className="flex items-center justify-between px-3 py-1.5 border-b bg-muted/30 shrink-0">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsCodeCollapsed(!isCodeCollapsed);
+              }}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {isCodeCollapsed ? (
+                <ChevronDownIcon className="w-4 h-4" />
+              ) : (
+                <ChevronUpIcon className="w-4 h-4" />
+              )}
+            </button>
+            <span className="text-xs font-medium text-muted-foreground">
+              {cell.name || `Cell`}
+            </span>
+            {cell.status === "running" && (
+              <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+            )}
+            {cell.status === "queued" && (
+              <span className="w-2 h-2 bg-yellow-500 rounded-full" />
+            )}
+            {cell.staleInputs && (
+              <span className="text-xs text-warning">stale</span>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              className="flex items-center gap-1 text-xs px-2 py-0.5 bg-primary/10 hover:bg-primary/20 text-primary rounded transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                actions.onRun(cellId);
+              }}
+            >
+              <PlayIcon className="w-3 h-3" />
+              Run
+            </button>
+          </div>
         </div>
-        <button
-          type="button"
-          className="text-xs px-2 py-0.5 bg-primary/10 hover:bg-primary/20 text-primary rounded transition-colors"
-          onClick={(e) => {
-            e.stopPropagation();
-            actions.onRun(cellId);
-          }}
-        >
-          Run
-        </button>
-      </div>
 
-      {/* Code Preview */}
-      <div className="flex-none border-b max-h-[120px] overflow-hidden">
-        <TinyCode code={cell.code} className="p-2" />
-      </div>
-
-      {/* Output Area */}
-      <div className="flex-1 overflow-auto min-h-0 p-2">
-        {hasOutput ? (
-          <OutputArea
-            allowExpand={false}
-            output={cell.output}
-            cellId={cellId}
-            stale={outputStale}
-            loading={loading}
-          />
-        ) : (
-          <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-            {cell.status === "running" ? "Running..." : "No output"}
+        {/* Code Section */}
+        {!isCodeCollapsed && (
+          <div
+            className="flex-none border-b overflow-hidden cursor-pointer"
+            style={{ maxHeight: Math.min(150, height * 0.4) }}
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              actions.onFocus(cellId);
+            }}
+          >
+            <TinyCode code={cell.code} className="p-2" />
           </div>
         )}
+
+        {/* Output Area */}
+        <div className="flex-1 overflow-auto min-h-0 p-2">
+          {hasOutput ? (
+            <OutputArea
+              allowExpand={false}
+              output={cell.output}
+              cellId={cellId}
+              stale={outputStale}
+              loading={loading}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
+              {cell.status === "running" ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  Running...
+                </span>
+              ) : (
+                "No output"
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

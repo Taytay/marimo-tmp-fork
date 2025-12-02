@@ -1,6 +1,6 @@
 /* Copyright 2024 Marimo. All rights reserved. */
 
-import React, { memo, useCallback, useEffect, useMemo, useRef } from "react";
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createShapeId,
   Tldraw,
@@ -10,17 +10,29 @@ import {
 import "tldraw/tldraw.css";
 
 import type { CellId } from "@/core/cells/ids";
+import { CellId as CellIdUtils } from "@/core/cells/ids";
 import type { CellData, CellRuntimeState } from "@/core/cells/types";
+import { useCellActions } from "@/core/cells/cells";
 import { useVariables } from "@/core/variables/state";
+import { useRunCells } from "@/components/editor/cell/useRunCells";
 import { cn } from "@/utils/cn";
 import type { ICellRendererProps } from "../types";
 import {
   CellShapeUtil,
   CellDataContext,
   CellActionsContext,
-  type CellActions,
+  type CanvasCellActions,
+  type AddCellDirection,
 } from "./cell-shape-util";
 import { updateDependencyArrows } from "./dependency-arrows";
+import { CanvasToolbar } from "./canvas-toolbar";
+import {
+  layoutShapesByDependency,
+  layoutShapesVertically,
+  layoutShapesHorizontally,
+  alignShapesLeft,
+  alignShapesTop,
+} from "./layout-utils";
 import type {
   CanvasLayout,
   CanvasCellPosition,
@@ -50,6 +62,9 @@ export const CanvasLayoutRenderer: React.FC<Props> = memo(
     const editorRef = useRef<Editor | null>(null);
     const cellShapeIdsRef = useRef<Map<CellId, TLShapeId>>(new Map());
     const isInitializedRef = useRef(false);
+    const [selectedCount, setSelectedCount] = useState(0);
+    const { createNewCell, focusCell } = useCellActions();
+    const runCells = useRunCells();
 
     // Create a map of cell data for the context
     const cellDataMap = useMemo(() => {
@@ -61,19 +76,172 @@ export const CanvasLayoutRenderer: React.FC<Props> = memo(
     }, [cells]);
 
     // Cell actions passed to the shape component
-    const cellActions: CellActions = useMemo(
+    const cellActions: CanvasCellActions = useMemo(
       () => ({
         onRun: (cellId: CellId) => {
-          // TODO: Integrate with cell running logic
-          console.log("Run cell:", cellId);
+          runCells([cellId]);
+        },
+        onDelete: (cellId: CellId) => {
+          // TODO: Implement cell deletion
+          console.log("Delete cell:", cellId);
         },
         onFocus: (cellId: CellId) => {
-          // TODO: Focus the cell for editing
-          console.log("Focus cell:", cellId);
+          focusCell({ cellId, where: "exact" });
+        },
+        onAddCell: (cellId: CellId, direction: AddCellDirection) => {
+          const editor = editorRef.current;
+          if (!editor) return;
+
+          const newCellId = CellIdUtils.create();
+
+          // Create the cell in the notebook
+          const before = direction === "above";
+          createNewCell({
+            cellId: before ? cellId : cellId,
+            before,
+            code: "",
+          });
+
+          // Get the position of the reference cell
+          const refShapeId = cellShapeIdsRef.current.get(cellId);
+          if (!refShapeId) return;
+
+          const refShape = editor.getShape(refShapeId);
+          if (!refShape) return;
+
+          // Calculate position for new cell based on direction
+          let newX = refShape.x;
+          let newY = refShape.y;
+          const width = DEFAULT_CELL_WIDTH;
+          const height = DEFAULT_CELL_HEIGHT;
+
+          switch (direction) {
+            case "above":
+              newY = refShape.y - height - CELL_SPACING;
+              break;
+            case "below":
+              newY = refShape.y + (refShape.props as { h: number }).h + CELL_SPACING;
+              break;
+            case "left":
+              newX = refShape.x - width - CELL_SPACING;
+              break;
+            case "right":
+              newX = refShape.x + (refShape.props as { w: number }).w + CELL_SPACING;
+              break;
+          }
+
+          // Create the shape for the new cell
+          const newShapeId = createShapeId();
+          editor.createShape({
+            id: newShapeId,
+            type: "cell",
+            x: newX,
+            y: newY,
+            props: {
+              w: width,
+              h: height,
+              cellId: newCellId,
+            },
+          });
+
+          cellShapeIdsRef.current.set(newCellId, newShapeId);
+
+          // Update layout
+          const positions = extractPositions(editor, cellShapeIdsRef.current);
+          setLayout({ cells: positions });
+
+          // Select the new cell
+          editor.select(newShapeId);
         },
       }),
-      []
+      [createNewCell, focusCell, runCells, setLayout]
     );
+
+    // Get selected cell shape IDs
+    const getSelectedCellShapeIds = useCallback((): TLShapeId[] => {
+      const editor = editorRef.current;
+      if (!editor) return [];
+
+      return editor
+        .getSelectedShapeIds()
+        .filter((id) => {
+          const shape = editor.getShape(id);
+          return shape?.type === "cell";
+        });
+    }, []);
+
+    // Layout operations
+    const handleLayoutVertical = useCallback(() => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      layoutShapesVertically(editor, getSelectedCellShapeIds());
+      const positions = extractPositions(editor, cellShapeIdsRef.current);
+      setLayout({ cells: positions });
+    }, [getSelectedCellShapeIds, setLayout]);
+
+    const handleLayoutHorizontal = useCallback(() => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      layoutShapesHorizontally(editor, getSelectedCellShapeIds());
+      const positions = extractPositions(editor, cellShapeIdsRef.current);
+      setLayout({ cells: positions });
+    }, [getSelectedCellShapeIds, setLayout]);
+
+    const handleLayoutByDependencyVertical = useCallback(() => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      layoutShapesByDependency(
+        editor,
+        getSelectedCellShapeIds(),
+        variables,
+        cellShapeIdsRef.current,
+        { direction: "TB" }
+      );
+      const positions = extractPositions(editor, cellShapeIdsRef.current);
+      setLayout({ cells: positions });
+    }, [getSelectedCellShapeIds, setLayout, variables]);
+
+    const handleLayoutByDependencyHorizontal = useCallback(() => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      layoutShapesByDependency(
+        editor,
+        getSelectedCellShapeIds(),
+        variables,
+        cellShapeIdsRef.current,
+        { direction: "LR" }
+      );
+      const positions = extractPositions(editor, cellShapeIdsRef.current);
+      setLayout({ cells: positions });
+    }, [getSelectedCellShapeIds, setLayout, variables]);
+
+    const handleAlignLeft = useCallback(() => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      alignShapesLeft(editor, getSelectedCellShapeIds());
+      const positions = extractPositions(editor, cellShapeIdsRef.current);
+      setLayout({ cells: positions });
+    }, [getSelectedCellShapeIds, setLayout]);
+
+    const handleAlignTop = useCallback(() => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      alignShapesTop(editor, getSelectedCellShapeIds());
+      const positions = extractPositions(editor, cellShapeIdsRef.current);
+      setLayout({ cells: positions });
+    }, [getSelectedCellShapeIds, setLayout]);
+
+    const handleZoomIn = useCallback(() => {
+      editorRef.current?.zoomIn();
+    }, []);
+
+    const handleZoomOut = useCallback(() => {
+      editorRef.current?.zoomOut();
+    }, []);
+
+    const handleZoomToFit = useCallback(() => {
+      editorRef.current?.zoomToFit({ animation: { duration: 200 } });
+    }, []);
 
     // Handle editor mount
     const handleMount = useCallback(
@@ -89,6 +257,16 @@ export const CanvasLayoutRenderer: React.FC<Props> = memo(
         // Update dependency arrows
         updateDependencyArrows(editor, variables, cellShapeIdsRef.current);
 
+        // Listen for selection changes
+        const handleSelectionChange = () => {
+          const selectedIds = editor.getSelectedShapeIds();
+          const cellCount = selectedIds.filter((id) => {
+            const shape = editor.getShape(id);
+            return shape?.type === "cell";
+          }).length;
+          setSelectedCount(cellCount);
+        };
+
         // Listen for shape changes to update layout
         const handleChange = () => {
           const positions = extractPositions(editor, cellShapeIdsRef.current);
@@ -97,11 +275,19 @@ export const CanvasLayoutRenderer: React.FC<Props> = memo(
           }
         };
 
-        // Use a store listener for changes
-        const unsubscribe = editor.store.listen(handleChange, {
-          source: "user",
-          scope: "document",
-        });
+        // Subscribe to store changes
+        const unsubscribe = editor.store.listen(
+          (entry) => {
+            handleChange();
+            if (entry.changes.updated) {
+              handleSelectionChange();
+            }
+          },
+          { source: "user", scope: "document" }
+        );
+
+        // Initial selection count
+        handleSelectionChange();
 
         return () => {
           unsubscribe();
@@ -138,10 +324,24 @@ export const CanvasLayoutRenderer: React.FC<Props> = memo(
           <div
             className={cn(
               "canvas-layout-container",
-              "w-full h-full",
+              "w-full h-full relative",
               isReadMode && "pointer-events-none"
             )}
           >
+            {!isReadMode && (
+              <CanvasToolbar
+                selectedCount={selectedCount}
+                onLayoutVertical={handleLayoutVertical}
+                onLayoutHorizontal={handleLayoutHorizontal}
+                onLayoutByDependencyVertical={handleLayoutByDependencyVertical}
+                onLayoutByDependencyHorizontal={handleLayoutByDependencyHorizontal}
+                onAlignLeft={handleAlignLeft}
+                onAlignTop={handleAlignTop}
+                onZoomIn={handleZoomIn}
+                onZoomOut={handleZoomOut}
+                onZoomToFit={handleZoomToFit}
+              />
+            )}
             <Tldraw
               shapeUtils={customShapeUtils}
               onMount={handleMount}
@@ -172,7 +372,7 @@ function initializeCellShapes(
   }
 
   // Create shapes for each cell
-  let currentY = 0;
+  let currentY = 50;
   for (const cell of cells) {
     const existingPos = positionMap.get(cell.id);
     const shapeId = createShapeId();

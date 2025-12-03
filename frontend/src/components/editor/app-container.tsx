@@ -38,9 +38,14 @@ export const AppContainer: React.FC<PropsWithChildren<Props>> = ({
               "mathjax_ignore",
               connectionState === WebSocketState.CLOSED && "disconnected",
               "bg-background w-full h-full text-textColor",
-              "flex flex-col overflow-y-auto",
+              "flex flex-col",
               width === "full" && "config-width-full",
-              width === "columns" ? "overflow-x-auto" : "overflow-x-hidden",
+              // Canvas mode needs both overflow directions, columns needs x
+              width === "canvas"
+                ? "overflow-hidden"
+                : width === "columns"
+                  ? "overflow-x-auto overflow-y-auto"
+                  : "overflow-x-hidden overflow-y-auto",
               "print:height-fit",
             )}
           >

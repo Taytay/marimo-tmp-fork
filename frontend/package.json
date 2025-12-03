@@ -165,6 +165,7 @@
     "tailwindcss-animate": "^1.0.7",
     "thememirror": "^2.0.1",
     "timestring": "^7.0.0",
+    "tldraw": "^4.2.0",
     "typescript-memoize": "^1.1.1",
     "use-acp": "0.2.5",
     "use-resize-observer": "^9.1.0",

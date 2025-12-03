@@ -6,6 +6,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { useAtomValue } from "jotai";
+import { selectAtom } from "jotai/utils";
 import {
   DatabaseIcon,
   SparklesIcon,
@@ -31,10 +32,13 @@ import type { CellColumnId } from "@/utils/id-tree";
 import { invariant } from "@/utils/invariant";
 import {
   columnIdsAtom,
+  flattenTopLevelNotebookCells,
+  notebookAtom,
   useCellActions,
   useCellIds,
   useScrollKey,
 } from "../../../core/cells/cells";
+import { useVariables } from "../../../core/variables/state";
 import { formatAll } from "../../../core/codemirror/format";
 import type { AppConfig, UserConfig } from "../../../core/config/config-schema";
 import type { AppMode } from "../../../core/mode";
@@ -47,6 +51,7 @@ import { useChromeActions } from "../chrome/state";
 import { Column } from "../columns/cell-column";
 import { NotebookBanner } from "../notebook-banner";
 import { StdinBlockingAlert } from "../stdin-blocking-alert";
+import { CanvasEditLayout } from "./canvas-edit";
 import { useFocusFirstEditor } from "./vertical-layout/useFocusFirstEditor";
 import { VerticalLayoutWrapper } from "./vertical-layout/vertical-layout-wrapper";
 
@@ -56,10 +61,26 @@ interface CellArrayProps {
   appConfig: AppConfig;
 }
 
+// Atom to get all cells flattened for canvas mode
+const allCellsAtom = selectAtom(notebookAtom, flattenTopLevelNotebookCells);
+
 export const CellArray: React.FC<CellArrayProps> = (props) => {
   const columnIds = useAtomValue(columnIdsAtom);
+  const { theme } = useTheme();
 
-  // Setup context for sorting
+  // For canvas mode, render the canvas layout directly
+  if (props.appConfig.width === "canvas") {
+    return (
+      <CanvasEditLayoutWrapper
+        mode={props.mode}
+        userConfig={props.userConfig}
+        appConfig={props.appConfig}
+        theme={theme}
+      />
+    );
+  }
+
+  // Setup context for sorting (non-canvas modes)
   return (
     <SortableCellsProvider multiColumn={props.appConfig.width === "columns"}>
       <SortableContext
@@ -70,6 +91,51 @@ export const CellArray: React.FC<CellArrayProps> = (props) => {
         <CellArrayInternal {...props} />
       </SortableContext>
     </SortableCellsProvider>
+  );
+};
+
+/**
+ * Wrapper component for canvas edit mode.
+ * Handles hotkeys and provides cell data.
+ */
+const CanvasEditLayoutWrapper: React.FC<{
+  mode: AppMode;
+  userConfig: UserConfig;
+  appConfig: AppConfig;
+  theme: Theme;
+}> = ({ mode, userConfig, appConfig, theme }) => {
+  const actions = useCellActions();
+  const { toggleSidebarPanel } = useChromeActions();
+  const cells = useAtomValue(allCellsAtom);
+  const variables = useVariables();
+
+  // HOTKEYS - same as CellArrayInternal
+  useHotkey("global.focusTop", actions.focusTopCell);
+  useHotkey("global.focusBottom", actions.focusBottomCell);
+  useHotkey("global.toggleSidebar", toggleSidebarPanel);
+  useHotkey("global.foldCode", actions.foldAll);
+  useHotkey("global.unfoldCode", actions.unfoldAll);
+  useHotkey("global.formatAll", () => {
+    formatAll();
+  });
+  useHotkey("cell.hideCode", Functions.NOOP);
+  useHotkey("cell.format", Functions.NOOP);
+
+  return (
+    <div className="w-full h-full flex flex-col">
+      <PackageAlert />
+      <StartupLogsAlert />
+      <StdinBlockingAlert />
+      <ConnectingAlert />
+      <CanvasEditLayout
+        cells={cells}
+        mode={mode}
+        userConfig={userConfig}
+        appConfig={appConfig}
+        theme={theme}
+        variables={variables}
+      />
+    </div>
   );
 };
 

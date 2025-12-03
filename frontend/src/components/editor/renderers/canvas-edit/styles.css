@@ -1,0 +1,112 @@
+/* Copyright 2024 Marimo. All rights reserved. */
+
+.canvas-edit-container {
+  /* Ensure the container fills available space */
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.canvas-edit-container .tl-container {
+  /* TLDraw container styling */
+  flex: 1;
+}
+
+/* Style the editable cell shapes - IMPORTANT: allow overflow for add-cell buttons */
+.canvas-edit-container [data-shape-type="editable-cell"] {
+  /* Ensure cells have proper backgrounds */
+  background: var(--background);
+  /* Allow content to overflow shape bounds for add-cell buttons */
+  overflow: visible !important;
+}
+
+/* Also allow overflow on the TLDraw shape wrapper */
+.canvas-edit-container .tl-shape-container {
+  overflow: visible !important;
+}
+
+/*
+ * Ensure cell HTML content renders ABOVE arrows.
+ * TLDraw renders arrows in SVG. The bringToFront/sendToBack methods control
+ * the index property of shapes, but HTML content may need explicit z-index
+ * to render above the SVG arrow layer.
+ */
+.canvas-edit-container .tl-html-container {
+  /* Ensure HTML content renders above SVG arrows */
+  z-index: 10 !important;
+}
+
+/* Hide some TLDraw UI elements we don't need for cell editing */
+.canvas-edit-container .tlui-menu-zone {
+  /* Keep the menu but style it */
+}
+
+/* Ensure cell content is properly contained */
+.canvas-edit-container .marimo-cell {
+  /* Override any default margins */
+  margin: 0 !important;
+  /* Ensure proper sizing within shape */
+  height: 100%;
+  overflow: auto;
+}
+
+/* Style for when a cell is being edited */
+.canvas-edit-container .tl-shape[data-state="editing"] {
+  /* Additional editing state styles */
+}
+
+/* Ensure add-cell buttons are always visible above other content */
+.canvas-edit-container [data-add-cell-button] {
+  z-index: 1000;
+}
+
+/* Ensure drag handle is visible */
+.canvas-edit-container [data-drag-handle] {
+  z-index: 1000;
+}
+
+/*
+ * Arrow styling - marching animation on hover
+ * Note: Dashed style is set via TLDraw's dash prop on the arrow shape
+ */
+
+/* Marching ants animation keyframes */
+@keyframes marching-ants {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+/* Target SVG paths inside arrow shapes for animation */
+.canvas-edit-container .tl-shape[data-shape-type='arrow'] svg path {
+  transition: stroke-dashoffset 0.3s ease;
+}
+
+/* Animate arrows when the canvas has a hovered/selected cell */
+.canvas-edit-container.has-active-cell .tl-shape[data-shape-type='arrow'] svg path {
+  animation: marching-ants 1s linear infinite;
+}
+
+/* Also animate on direct arrow hover */
+.canvas-edit-container .tl-shape[data-shape-type='arrow']:hover svg path {
+  animation: marching-ants 0.5s linear infinite;
+}
+
+/*
+ * Arrow labels - hidden by default, shown when connected cells are active
+ */
+.canvas-edit-container .tl-shape[data-shape-type='arrow'] .tl-text-label {
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+  pointer-events: none;
+}
+
+/* Show labels when canvas has active cell */
+.canvas-edit-container.has-active-cell .tl-shape[data-shape-type='arrow'] .tl-text-label {
+  opacity: 1;
+}
+
+/* Show labels on direct arrow shape hover */
+.canvas-edit-container .tl-shape[data-shape-type='arrow']:hover .tl-text-label {
+  opacity: 1;
+}

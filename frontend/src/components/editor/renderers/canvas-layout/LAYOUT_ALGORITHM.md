@@ -143,9 +143,27 @@ For the Marimo canvas layout, we adapt this algorithm:
 
 1. **Cells as Nodes**: Each notebook cell becomes a node with its computed output size
 2. **Dependencies as Edges**: Variable references between cells create directed edges
-3. **Layering**: Cells are layered by their dependency depth
-4. **Railroad Edges**: Dependencies are shown as railroad-style curved arrows
-5. **Interactive**: Users can drag cells, and the layout provides "organize" operations
+3. **Layering**: Cells are layered by their dependency depth (using Dagre)
+4. **Railroad Edges**: Dependencies are shown as railroad-style elbow arrows (TLDraw `kind: "elbow"`)
+5. **Edge Straightening**: Multiple passes refine positions after initial layout
+6. **Interactive**: Users can drag cells, and the layout provides "organize" operations
+
+### Implementation Details
+
+The layout algorithm is implemented in `layout-utils.ts`:
+
+1. **Initial Layout**: Uses Dagre (Sugiyama algorithm) for hierarchical positioning
+2. **Edge Straightening Passes** (run `LAYOUT_ITERATIONS` times):
+   - `pushNeighbors`: Ensure minimum `BLOCK_GAP` (44px) between nodes in same row
+   - `straightenChildren`: Align single-parent nodes with their parent horizontally
+   - `straightenNearlyStraightEdges`: Snap edges within `NEARLY_STRAIGHT` (30px) threshold to vertical
+
+Constants adapted from iongraph:
+```typescript
+const BLOCK_GAP = 44;         // Minimum horizontal spacing between nodes
+const NEARLY_STRAIGHT = 30;   // Threshold for "almost vertical" edges
+const LAYOUT_ITERATIONS = 2;  // Number of straightening passes
+```
 
 ### Simplifications for Notebooks
 
@@ -153,6 +171,7 @@ For the Marimo canvas layout, we adapt this algorithm:
 - Fewer nodes than compiler graphs (typically <100 cells)
 - User-positioned nodes (layout is a suggestion, not mandatory)
 - Real-time updates as dependencies change
+- Uses TLDraw's built-in elbow arrows instead of custom SVG path rendering
 
 ## References
 

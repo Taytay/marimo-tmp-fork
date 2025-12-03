@@ -6,6 +6,11 @@ import type { CellId } from "@/core/cells/ids";
 import type { Variables } from "@/core/variables/types";
 import { CELL_SPACING } from "./types";
 
+// Edge straightening constants (adapted from iongraph)
+const BLOCK_GAP = 44; // Minimum horizontal spacing between nodes
+const NEARLY_STRAIGHT = 30; // Threshold for "almost vertical" edges
+const LAYOUT_ITERATIONS = 2; // Number of straightening passes
+
 /**
  * A cell-like shape with w/h props (supports both "cell" and "editable-cell" types)
  */
@@ -174,6 +179,157 @@ export function groupByLevel(
 }
 
 /**
+ * Node position for edge straightening passes.
+ */
+interface NodePosition {
+  id: CellId;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Push neighbors apart to ensure minimum spacing.
+ * Nodes are pushed to the right if they overlap with their left neighbor.
+ */
+function pushNeighbors(nodes: NodePosition[]): void {
+  // Sort by x position within each row (same y)
+  const byY = new Map<number, NodePosition[]>();
+  for (const node of nodes) {
+    const row = byY.get(node.y) || [];
+    row.push(node);
+    byY.set(node.y, row);
+  }
+
+  for (const row of byY.values()) {
+    // Sort by x position
+    row.sort((a, b) => a.x - b.x);
+
+    // Push neighbors apart
+    for (let i = 1; i < row.length; i++) {
+      const prev = row[i - 1];
+      const curr = row[i];
+      const minX = prev.x + prev.width + BLOCK_GAP;
+      if (curr.x < minX) {
+        curr.x = minX;
+      }
+    }
+  }
+}
+
+/**
+ * Align child nodes horizontally with their parents to create straighter edges.
+ * A child is aligned with its parent if it has only one parent.
+ */
+function straightenChildren(
+  nodes: NodePosition[],
+  dependencies: Map<CellId, Set<CellId>>,
+): void {
+  const nodeMap = new Map<CellId, NodePosition>();
+  for (const node of nodes) {
+    nodeMap.set(node.id, node);
+  }
+
+  // Build reverse dependency map (parent -> children)
+  const children = new Map<CellId, Set<CellId>>();
+  for (const [childId, deps] of dependencies.entries()) {
+    for (const parentId of deps) {
+      const childSet = children.get(parentId) || new Set();
+      childSet.add(childId);
+      children.set(parentId, childSet);
+    }
+  }
+
+  // For each node with a single parent, try to align horizontally
+  for (const [childId, deps] of dependencies.entries()) {
+    if (deps.size !== 1) {
+      continue;
+    }
+
+    const parentId = [...deps][0];
+    const parent = nodeMap.get(parentId);
+    const child = nodeMap.get(childId);
+
+    if (!parent || !child) {
+      continue;
+    }
+
+    // Only move right (conservative straightening)
+    const parentCenterX = parent.x + parent.width / 2;
+    const childCenterX = child.x + child.width / 2;
+
+    if (parentCenterX > childCenterX) {
+      // Move child right to align with parent center
+      child.x = parentCenterX - child.width / 2;
+    }
+  }
+}
+
+/**
+ * Straighten edges that are "nearly straight" (within threshold).
+ * If two connected nodes have their centers within NEARLY_STRAIGHT pixels
+ * horizontally, align them to create a perfectly vertical edge.
+ */
+function straightenNearlyStraightEdges(
+  nodes: NodePosition[],
+  dependencies: Map<CellId, Set<CellId>>,
+): void {
+  const nodeMap = new Map<CellId, NodePosition>();
+  for (const node of nodes) {
+    nodeMap.set(node.id, node);
+  }
+
+  for (const [childId, deps] of dependencies.entries()) {
+    const child = nodeMap.get(childId);
+    if (!child) {
+      continue;
+    }
+
+    for (const parentId of deps) {
+      const parent = nodeMap.get(parentId);
+      if (!parent) {
+        continue;
+      }
+
+      const parentCenterX = parent.x + parent.width / 2;
+      const childCenterX = child.x + child.width / 2;
+      const dx = Math.abs(parentCenterX - childCenterX);
+
+      // If nearly straight, align the child with the parent
+      if (dx > 0 && dx <= NEARLY_STRAIGHT) {
+        // Move child to align centers (only move right for conservative straightening)
+        if (parentCenterX > childCenterX) {
+          child.x = parentCenterX - child.width / 2;
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Run all edge straightening passes.
+ */
+function runStraighteningPasses(
+  nodes: NodePosition[],
+  dependencies: Map<CellId, Set<CellId>>,
+): void {
+  for (let i = 0; i < LAYOUT_ITERATIONS; i++) {
+    // Push neighbors to ensure minimum spacing
+    pushNeighbors(nodes);
+
+    // Align children with parents
+    straightenChildren(nodes, dependencies);
+
+    // Straighten nearly-vertical edges
+    straightenNearlyStraightEdges(nodes, dependencies);
+
+    // Push neighbors again after straightening
+    pushNeighbors(nodes);
+  }
+}
+
+/**
  * Layout selected shapes in dependency order.
  */
 export function layoutShapesByDependency(
@@ -260,8 +416,8 @@ export function layoutShapesByDependency(
     }
   }
 
-  // Update shape positions
-  const updates: { id: TLShapeId; x: number; y: number }[] = [];
+  // Extract positions from dagre and apply edge straightening
+  const nodePositions: NodePosition[] = [];
 
   for (const cellId of selectedCellIds) {
     const shapeId = cellShapeIds.get(cellId);
@@ -279,11 +435,35 @@ export function layoutShapesByDependency(
       continue;
     }
 
+    const width = (shape.props as { w: number }).w;
+    const height = (shape.props as { h: number }).h;
+
     // Position from dagre is center-based, convert to top-left
+    nodePositions.push({
+      id: cellId,
+      x: minX + node.x - width / 2,
+      y: minY + node.y - height / 2,
+      width,
+      height,
+    });
+  }
+
+  // Apply edge straightening passes to refine positions
+  runStraighteningPasses(nodePositions, dependencies);
+
+  // Build final updates from refined positions
+  const updates: { id: TLShapeId; x: number; y: number }[] = [];
+
+  for (const nodePos of nodePositions) {
+    const shapeId = cellShapeIds.get(nodePos.id);
+    if (!shapeId) {
+      continue;
+    }
+
     updates.push({
       id: shapeId,
-      x: minX + node.x - (shape.props as { w: number }).w / 2,
-      y: minY + node.y - (shape.props as { h: number }).h / 2,
+      x: nodePos.x,
+      y: nodePos.y,
     });
   }
 

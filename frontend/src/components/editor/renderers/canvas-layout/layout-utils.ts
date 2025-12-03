@@ -34,7 +34,10 @@ function isCellLikeShape(shape: unknown): shape is CellLikeShape {
 /**
  * Get cell-like shapes from shape IDs, filtering out non-cell shapes.
  */
-function getCellLikeShapes(editor: Editor, shapeIds: TLShapeId[]): CellLikeShape[] {
+function getCellLikeShapes(
+  editor: Editor,
+  shapeIds: TLShapeId[],
+): CellLikeShape[] {
   const result: CellLikeShape[] = [];
   for (const id of shapeIds) {
     const shape = editor.getShape(id);
@@ -366,8 +369,7 @@ export function layoutShapesVertically(
   editor: Editor,
   shapeIds: TLShapeId[],
 ): void {
-  const shapes = getCellLikeShapes(editor, shapeIds)
-    .sort((a, b) => a.y - b.y); // Maintain relative order
+  const shapes = getCellLikeShapes(editor, shapeIds).sort((a, b) => a.y - b.y); // Maintain relative order
 
   if (shapes.length === 0) {
     return;
@@ -399,8 +401,7 @@ export function layoutShapesHorizontally(
   editor: Editor,
   shapeIds: TLShapeId[],
 ): void {
-  const shapes = getCellLikeShapes(editor, shapeIds)
-    .sort((a, b) => a.x - b.x); // Maintain relative order
+  const shapes = getCellLikeShapes(editor, shapeIds).sort((a, b) => a.x - b.x); // Maintain relative order
 
   if (shapes.length === 0) {
     return;

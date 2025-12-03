@@ -62,10 +62,16 @@ export function createDependencyArrows(
   const arrowIds: TLShapeId[] = [];
   for (const [key, varNames] of connectionVariables.entries()) {
     const [fromShapeId, toShapeId] = key.split("|||") as [TLShapeId, TLShapeId];
-    const label = varNames.length <= 3
-      ? varNames.join(", ")
-      : `${varNames.slice(0, 2).join(", ")} +${varNames.length - 2}`;
-    const arrowId = createArrowBetweenShapes(editor, fromShapeId, toShapeId, label);
+    const label =
+      varNames.length <= 3
+        ? varNames.join(", ")
+        : `${varNames.slice(0, 2).join(", ")} +${varNames.length - 2}`;
+    const arrowId = createArrowBetweenShapes(
+      editor,
+      fromShapeId,
+      toShapeId,
+      label,
+    );
     arrowIds.push(arrowId);
   }
 
@@ -148,7 +154,10 @@ function getClosestEdges(
         return {
           edge,
           anchor: { x: 0.5, y: 1 },
-          point: { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height },
+          point: {
+            x: bounds.x + bounds.width / 2,
+            y: bounds.y + bounds.height,
+          },
         };
       case "left":
         return {
@@ -160,7 +169,10 @@ function getClosestEdges(
         return {
           edge,
           anchor: { x: 1, y: 0.5 },
-          point: { x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2 },
+          point: {
+            x: bounds.x + bounds.width,
+            y: bounds.y + bounds.height / 2,
+          },
         };
     }
   };
@@ -205,6 +217,7 @@ export function createArrowBetweenShapes(
   const arrowId = createShapeId();
 
   // Create the arrow shape (locked so it's not selectable)
+  // Use 'elbow' kind for railroad-style orthogonal arrows with right-angle turns
   editor.createShape({
     id: arrowId,
     type: "arrow",
@@ -225,6 +238,9 @@ export function createArrowBetweenShapes(
       dash: "dashed",
       arrowheadEnd: "arrow",
       arrowheadStart: "none",
+      // Use elbow arrows for railroad-style orthogonal routing
+      // This creates right-angle turns instead of curved arcs
+      kind: "elbow",
       // Use richText for arrow labels (TLDraw v3 format)
       richText: label
         ? {
@@ -283,7 +299,9 @@ export function clearDependencyArrows(editor: Editor): void {
     const bindings = editor.getBindingsFromShape(shape, "arrow");
     return bindings.some((binding) => {
       const targetShape = editor.getShape(binding.toId);
-      return targetShape?.type === "cell" || targetShape?.type === "editable-cell";
+      return (
+        targetShape?.type === "cell" || targetShape?.type === "editable-cell"
+      );
     });
   });
 

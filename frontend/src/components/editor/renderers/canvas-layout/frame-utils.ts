@@ -3,8 +3,8 @@
 import { createShapeId, type Editor, type TLShapeId } from "tldraw";
 import type { CellId } from "@/core/cells/ids";
 import type { CellData, CellRuntimeState } from "@/core/cells/types";
-import type { CollapsibleTree } from "@/utils/id-tree";
 import { canCollapseOutline } from "@/core/dom/outline";
+import type { CollapsibleTree } from "@/utils/id-tree";
 
 // Frame padding around cells
 const FRAME_PADDING = 20;
@@ -45,8 +45,10 @@ export function createColumnFrames(
     const frameId = createShapeId();
     const frameX = columnBounds.minX - FRAME_PADDING;
     const frameY = columnBounds.minY - FRAME_PADDING - 30; // Extra space for label
-    const frameWidth = columnBounds.maxX - columnBounds.minX + FRAME_PADDING * 2;
-    const frameHeight = columnBounds.maxY - columnBounds.minY + FRAME_PADDING * 2 + 30;
+    const frameWidth =
+      columnBounds.maxX - columnBounds.minX + FRAME_PADDING * 2;
+    const frameHeight =
+      columnBounds.maxY - columnBounds.minY + FRAME_PADDING * 2 + 30;
 
     editor.createShape({
       id: frameId,
@@ -119,8 +121,10 @@ function createHeaderFramesForColumn(
     const frameId = createShapeId();
     const frameX = groupBounds.minX - HEADER_FRAME_PADDING;
     const frameY = groupBounds.minY - HEADER_FRAME_PADDING - 25; // Space for label
-    const frameWidth = groupBounds.maxX - groupBounds.minX + HEADER_FRAME_PADDING * 2;
-    const frameHeight = groupBounds.maxY - groupBounds.minY + HEADER_FRAME_PADDING * 2 + 25;
+    const frameWidth =
+      groupBounds.maxX - groupBounds.minX + HEADER_FRAME_PADDING * 2;
+    const frameHeight =
+      groupBounds.maxY - groupBounds.minY + HEADER_FRAME_PADDING * 2 + 25;
 
     // TODO: Add frame color support based on headerLevel when TLDraw supports it
 
@@ -187,7 +191,9 @@ function findHeaderGroups(
     if (isHeader && outline) {
       // Find the highest-level header in this cell
       const headerLevel = Math.min(...outline.items.map((item) => item.level));
-      const headerItem = outline.items.find((item) => item.level === headerLevel);
+      const headerItem = outline.items.find(
+        (item) => item.level === headerLevel,
+      );
       const headerText = headerItem?.name || "Section";
 
       // If we have a current group and this header is same or higher level, close it
@@ -276,9 +282,9 @@ function calculateGroupBounds(
  * Update frame bounds when cells move.
  */
 export function updateFrameBounds(
-  editor: Editor,
-  columnFrameIds: Map<number, TLShapeId>,
-  headerFrameIds: Map<CellId, TLShapeId>,
+  _editor: Editor,
+  _columnFrameIds: Map<number, TLShapeId>,
+  _headerFrameIds: Map<CellId, TLShapeId>,
 ): void {
   // For now, frames don't auto-resize. Users can manually resize them.
   // In the future, we could implement auto-fit based on child positions.
@@ -288,7 +294,9 @@ export function updateFrameBounds(
  * Clear all frames from the canvas.
  */
 export function clearAllFrames(editor: Editor): void {
-  const frames = editor.getCurrentPageShapes().filter((shape) => shape.type === "frame");
+  const frames = editor
+    .getCurrentPageShapes()
+    .filter((shape) => shape.type === "frame");
   if (frames.length > 0) {
     editor.deleteShapes(frames.map((f) => f.id));
   }

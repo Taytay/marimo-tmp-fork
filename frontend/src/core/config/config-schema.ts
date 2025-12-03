@@ -23,6 +23,7 @@ const VALID_APP_WIDTHS = [
   "medium",
   "full",
   "columns",
+  "canvas",
 ] as const;
 
 /**

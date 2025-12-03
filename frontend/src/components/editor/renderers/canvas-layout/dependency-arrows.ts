@@ -178,11 +178,11 @@ export function clearDependencyArrows(editor: Editor): void {
     if (shape.type !== "arrow") {
       return false;
     }
-    // Check if this arrow is bound to cell shapes
+    // Check if this arrow is bound to cell shapes (either read-mode "cell" or edit-mode "editable-cell")
     const bindings = editor.getBindingsFromShape(shape, "arrow");
     return bindings.some((binding) => {
       const targetShape = editor.getShape(binding.toId);
-      return targetShape?.type === "cell";
+      return targetShape?.type === "cell" || targetShape?.type === "editable-cell";
     });
   });
 

@@ -97,7 +97,7 @@ ExecutionType = Literal["relaxed", "strict"]
 
 # TODO(akshayka): remove normal, migrate to compact
 # normal == compact
-WidthType = Literal["normal", "compact", "medium", "full", "columns"]
+WidthType = Literal["normal", "compact", "medium", "full", "columns", "canvas"]
 Theme = Literal["light", "dark", "system"]
 ExportType = Literal["html", "markdown", "ipynb"]
 SqlOutputType = Literal["polars", "lazy-polars", "pandas", "native", "auto"]

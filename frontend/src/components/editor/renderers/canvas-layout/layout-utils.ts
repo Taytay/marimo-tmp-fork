@@ -78,8 +78,9 @@ export function computeExecutionLevels(
   const visited = new Set<CellId>();
 
   function computeLevel(cellId: CellId): number {
-    if (levels.has(cellId)) {
-      return levels.get(cellId)!;
+    const cachedLevel = levels.get(cellId);
+    if (cachedLevel !== undefined) {
+      return cachedLevel;
     }
 
     if (visited.has(cellId)) {

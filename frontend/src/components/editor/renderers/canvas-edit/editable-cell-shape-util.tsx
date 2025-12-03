@@ -68,6 +68,7 @@ export interface CanvasCellActionsContext {
   onAddCellAbove: (cellId: CellId) => void;
   onAddCellBelow: (cellId: CellId) => void;
   getSelectedCount: () => number;
+  onCellHover: (isHovered: boolean) => void;
 }
 
 export const CanvasCellActionsContext = React.createContext<CanvasCellActionsContext>({
@@ -81,6 +82,9 @@ export const CanvasCellActionsContext = React.createContext<CanvasCellActionsCon
     // Default no-op
   },
   getSelectedCount: () => 0,
+  onCellHover: () => {
+    // Default no-op
+  },
 });
 
 /**
@@ -177,8 +181,8 @@ const EditableCellShapeContent: React.FC<{
   isSelected: boolean;
   isMultiSelected: boolean;
 }> = memo(({ shapeId, cellId, width, height, isSelected, isMultiSelected }) => {
-  const { renderCell, } = React.useContext(CellRenderContext);
-  const { onStartDrag, onAddCellAbove, onAddCellBelow } = React.useContext(CanvasCellActionsContext);
+  const { renderCell } = React.useContext(CellRenderContext);
+  const { onStartDrag, onAddCellAbove, onAddCellBelow, onCellHover } = React.useContext(CanvasCellActionsContext);
   const cellDataMap = React.useContext(CellDataContext);
   const cell = cellDataMap.get(cellId);
 
@@ -227,6 +231,9 @@ const EditableCellShapeContent: React.FC<{
         // Stop propagation for everything else so TLDraw doesn't select/drag
         e.stopPropagation();
       }}
+      // Track hover state for arrow animations
+      onMouseEnter={() => onCellHover(true)}
+      onMouseLeave={() => onCellHover(false)}
     >
       {/* Add cell button - ABOVE (outside shape bounds) */}
       <div

@@ -21,12 +21,8 @@ export function createDependencyArrows(
   variables: Variables,
   cellShapeIds: Map<CellId, TLShapeId>,
 ): void {
-  const visited = new Set<string>();
-  const arrowsToCreate: {
-    fromShapeId: TLShapeId;
-    toShapeId: TLShapeId;
-    variableName: string;
-  }[] = [];
+  // Group variables by the cell pairs they connect
+  const connectionVariables = new Map<string, string[]>();
 
   for (const variable of Object.values(variables)) {
     // Skip marimo module (likely every cell uses it)
@@ -43,30 +39,33 @@ export function createDependencyArrows(
           continue;
         }
 
-        const key = `${fromId}-${toId}`;
-        if (visited.has(key)) {
-          continue;
-        }
-        visited.add(key);
-
         const fromShapeId = cellShapeIds.get(fromId);
         const toShapeId = cellShapeIds.get(toId);
 
         if (fromShapeId && toShapeId) {
-          arrowsToCreate.push({
-            fromShapeId,
-            toShapeId,
-            variableName: variable.name,
-          });
+          // Use a delimiter that won't appear in shape IDs (which contain dashes)
+          const key = `${fromShapeId}|||${toShapeId}`;
+          const existing = connectionVariables.get(key);
+          if (existing) {
+            if (!existing.includes(variable.name)) {
+              existing.push(variable.name);
+            }
+          } else {
+            connectionVariables.set(key, [variable.name]);
+          }
         }
       }
     }
   }
 
-  // Batch create all arrows
+  // Create arrows with variable labels
   const arrowIds: TLShapeId[] = [];
-  for (const { fromShapeId, toShapeId } of arrowsToCreate) {
-    const arrowId = createArrowBetweenShapes(editor, fromShapeId, toShapeId);
+  for (const [key, varNames] of connectionVariables.entries()) {
+    const [fromShapeId, toShapeId] = key.split("|||") as [TLShapeId, TLShapeId];
+    const label = varNames.length <= 3
+      ? varNames.join(", ")
+      : `${varNames.slice(0, 2).join(", ")} +${varNames.length - 2}`;
+    const arrowId = createArrowBetweenShapes(editor, fromShapeId, toShapeId, label);
     arrowIds.push(arrowId);
   }
 
@@ -77,16 +76,114 @@ export function createDependencyArrows(
 }
 
 /**
- * Creates an arrow shape connecting two shapes.
+ * Edge position on a shape (normalized 0-1 coordinates)
+ */
+type EdgePosition = "top" | "bottom" | "left" | "right";
+
+interface EdgeAnchor {
+  edge: EdgePosition;
+  anchor: { x: number; y: number };
+  point: { x: number; y: number };
+}
+
+/**
+ * Calculate the closest edges between two shapes.
+ */
+function getClosestEdges(
+  startBounds: { x: number; y: number; width: number; height: number },
+  endBounds: { x: number; y: number; width: number; height: number },
+): { start: EdgeAnchor; end: EdgeAnchor } {
+  // Calculate centers
+  const startCenter = {
+    x: startBounds.x + startBounds.width / 2,
+    y: startBounds.y + startBounds.height / 2,
+  };
+  const endCenter = {
+    x: endBounds.x + endBounds.width / 2,
+    y: endBounds.y + endBounds.height / 2,
+  };
+
+  // Calculate the direction from start to end
+  const dx = endCenter.x - startCenter.x;
+  const dy = endCenter.y - startCenter.y;
+
+  // Determine which edges to use based on relative positions
+  let startEdge: EdgePosition;
+  let endEdge: EdgePosition;
+
+  // Use the dominant direction to determine edges
+  if (Math.abs(dx) > Math.abs(dy)) {
+    // Horizontal dominant
+    if (dx > 0) {
+      startEdge = "right";
+      endEdge = "left";
+    } else {
+      startEdge = "left";
+      endEdge = "right";
+    }
+  } else {
+    // Vertical dominant
+    if (dy > 0) {
+      startEdge = "bottom";
+      endEdge = "top";
+    } else {
+      startEdge = "top";
+      endEdge = "bottom";
+    }
+  }
+
+  // Calculate anchor points and actual positions
+  const getEdgeInfo = (
+    bounds: { x: number; y: number; width: number; height: number },
+    edge: EdgePosition,
+  ): EdgeAnchor => {
+    switch (edge) {
+      case "top":
+        return {
+          edge,
+          anchor: { x: 0.5, y: 0 },
+          point: { x: bounds.x + bounds.width / 2, y: bounds.y },
+        };
+      case "bottom":
+        return {
+          edge,
+          anchor: { x: 0.5, y: 1 },
+          point: { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height },
+        };
+      case "left":
+        return {
+          edge,
+          anchor: { x: 0, y: 0.5 },
+          point: { x: bounds.x, y: bounds.y + bounds.height / 2 },
+        };
+      case "right":
+        return {
+          edge,
+          anchor: { x: 1, y: 0.5 },
+          point: { x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2 },
+        };
+    }
+  };
+
+  return {
+    start: getEdgeInfo(startBounds, startEdge),
+    end: getEdgeInfo(endBounds, endEdge),
+  };
+}
+
+/**
+ * Creates an arrow shape connecting two shapes from closest edges.
  *
  * @param editor - The TLDraw editor instance
  * @param startShapeId - The source shape ID
  * @param endShapeId - The target shape ID
+ * @param label - Optional label to display on the arrow
  */
 export function createArrowBetweenShapes(
   editor: Editor,
   startShapeId: TLShapeId,
   endShapeId: TLShapeId,
+  label?: string,
 ): TLShapeId {
   const startShape = editor.getShape(startShapeId);
   const endShape = editor.getShape(endShapeId);
@@ -102,17 +199,8 @@ export function createArrowBetweenShapes(
     throw new Error("Cannot create arrow: one or both shapes have no bounds");
   }
 
-  // Calculate arrow start and end points
-  // Start from the bottom center of the source shape
-  // End at the top center of the target shape
-  const startPoint = {
-    x: startBounds.x + startBounds.width / 2,
-    y: startBounds.y + startBounds.height,
-  };
-  const endPoint = {
-    x: endBounds.x + endBounds.width / 2,
-    y: endBounds.y,
-  };
+  // Calculate closest edges
+  const { start, end } = getClosestEdges(startBounds, endBounds);
 
   const arrowId = createShapeId();
 
@@ -120,8 +208,8 @@ export function createArrowBetweenShapes(
   editor.createShape({
     id: arrowId,
     type: "arrow",
-    x: startPoint.x,
-    y: startPoint.y,
+    x: start.point.x,
+    y: start.point.y,
     isLocked: true,
     props: {
       start: {
@@ -129,13 +217,26 @@ export function createArrowBetweenShapes(
         y: 0,
       },
       end: {
-        x: endPoint.x - startPoint.x,
-        y: endPoint.y - startPoint.y,
+        x: end.point.x - start.point.x,
+        y: end.point.y - start.point.y,
       },
       color: "grey",
       size: "s",
+      dash: "dashed",
       arrowheadEnd: "arrow",
       arrowheadStart: "none",
+      // Use richText for arrow labels (TLDraw v3 format)
+      richText: label
+        ? {
+            type: "doc",
+            content: [
+              {
+                type: "paragraph",
+                content: [{ type: "text", text: label }],
+              },
+            ],
+          }
+        : undefined,
     },
   });
 
@@ -147,7 +248,7 @@ export function createArrowBetweenShapes(
       type: "arrow",
       props: {
         terminal: "start",
-        normalizedAnchor: { x: 0.5, y: 1 }, // Bottom center
+        normalizedAnchor: start.anchor,
         isPrecise: false,
         isExact: false,
       },
@@ -158,7 +259,7 @@ export function createArrowBetweenShapes(
       type: "arrow",
       props: {
         terminal: "end",
-        normalizedAnchor: { x: 0.5, y: 0 }, // Top center
+        normalizedAnchor: end.anchor,
         isPrecise: false,
         isExact: false,
       },

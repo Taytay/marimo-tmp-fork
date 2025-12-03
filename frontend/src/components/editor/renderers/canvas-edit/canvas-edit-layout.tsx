@@ -36,6 +36,14 @@ import {
   DEFAULT_CELL_WIDTH,
 } from "./types";
 import { updateDependencyArrows } from "../canvas-layout/dependency-arrows";
+import { CanvasToolbar } from "../canvas-layout/canvas-toolbar";
+import {
+  alignShapesLeft,
+  alignShapesTop,
+  layoutShapesByDependency,
+  layoutShapesHorizontally,
+  layoutShapesVertically,
+} from "../canvas-layout/layout-utils";
 
 import "./styles.css";
 
@@ -63,6 +71,8 @@ export const CanvasEditLayout: React.FC<CanvasEditLayoutProps> = memo(
     const cellShapeIdsRef = useRef<Map<CellId, TLShapeId>>(new Map());
     const isInitializedRef = useRef(false);
     const [layout, setLayout] = useState<CanvasEditLayoutState>({ cells: [] });
+    const [selectedCount, setSelectedCount] = useState(0);
+    const [hasActiveCell, setHasActiveCell] = useState(false);
 
     // Get cell actions for adding new cells
     const { createNewCell } = useCellActions();
@@ -127,6 +137,9 @@ export const CanvasEditLayout: React.FC<CanvasEditLayoutProps> = memo(
           const editor = editorRef.current;
           return editor ? editor.getSelectedShapeIds().length : 0;
         },
+        onCellHover: (isHovered: boolean) => {
+          setHasActiveCell(isHovered);
+        },
       }),
       [createNewCell]
     );
@@ -160,15 +173,30 @@ export const CanvasEditLayout: React.FC<CanvasEditLayoutProps> = memo(
         };
 
         // Subscribe to document changes (shape positions, etc.)
-        const unsubscribe = editor.store.listen(
+        const unsubscribeDoc = editor.store.listen(
           () => {
             handleChange();
           },
           { source: "user", scope: "document" }
         );
 
+        // Subscribe to selection changes
+        const unsubscribeSelection = editor.store.listen(
+          () => {
+            const selectedIds = editor.getSelectedShapeIds();
+            // Only count cell shapes
+            const cellCount = selectedIds.filter((id) => {
+              const shape = editor.getShape(id);
+              return shape?.type === "editable-cell";
+            }).length;
+            setSelectedCount(cellCount);
+          },
+          { source: "user", scope: "session" }
+        );
+
         return () => {
-          unsubscribe();
+          unsubscribeDoc();
+          unsubscribeSelection();
         };
       },
       [cells, layout, variables]
@@ -200,6 +228,67 @@ export const CanvasEditLayout: React.FC<CanvasEditLayoutProps> = memo(
       }
     }, [variables]);
 
+    // Toolbar handlers
+    const handleLayoutVertical = useCallback(() => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      const selectedIds = editor.getSelectedShapeIds();
+      layoutShapesVertically(editor, selectedIds);
+      updateDependencyArrows(editor, variables, cellShapeIdsRef.current);
+    }, [variables]);
+
+    const handleLayoutHorizontal = useCallback(() => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      const selectedIds = editor.getSelectedShapeIds();
+      layoutShapesHorizontally(editor, selectedIds);
+      updateDependencyArrows(editor, variables, cellShapeIdsRef.current);
+    }, [variables]);
+
+    const handleLayoutByDependencyVertical = useCallback(() => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      const selectedIds = editor.getSelectedShapeIds();
+      layoutShapesByDependency(editor, selectedIds, variables, cellShapeIdsRef.current, { direction: "TB" });
+      updateDependencyArrows(editor, variables, cellShapeIdsRef.current);
+    }, [variables]);
+
+    const handleLayoutByDependencyHorizontal = useCallback(() => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      const selectedIds = editor.getSelectedShapeIds();
+      layoutShapesByDependency(editor, selectedIds, variables, cellShapeIdsRef.current, { direction: "LR" });
+      updateDependencyArrows(editor, variables, cellShapeIdsRef.current);
+    }, [variables]);
+
+    const handleAlignLeft = useCallback(() => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      const selectedIds = editor.getSelectedShapeIds();
+      alignShapesLeft(editor, selectedIds);
+      updateDependencyArrows(editor, variables, cellShapeIdsRef.current);
+    }, [variables]);
+
+    const handleAlignTop = useCallback(() => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      const selectedIds = editor.getSelectedShapeIds();
+      alignShapesTop(editor, selectedIds);
+      updateDependencyArrows(editor, variables, cellShapeIdsRef.current);
+    }, [variables]);
+
+    const handleZoomIn = useCallback(() => {
+      editorRef.current?.zoomIn();
+    }, []);
+
+    const handleZoomOut = useCallback(() => {
+      editorRef.current?.zoomOut();
+    }, []);
+
+    const handleZoomToFit = useCallback(() => {
+      editorRef.current?.zoomToFit({ animation: { duration: 200 } });
+    }, []);
+
     return (
       <CellDataContext.Provider value={cellDataMap}>
         <UserConfigContext.Provider value={userConfig}>
@@ -212,12 +301,26 @@ export const CanvasEditLayout: React.FC<CanvasEditLayoutProps> = memo(
                     "w-full h-full relative",
                     // Fill the available space
                     "min-h-[calc(100vh-100px)]",
+                    // Add class when cells are hovered or selected for arrow animations
+                    (hasActiveCell || selectedCount > 0) && "has-active-cell",
                   )}
                 >
                   <Tldraw
                     shapeUtils={customShapeUtils}
                     onMount={handleMount}
                     inferDarkMode={true}
+                  />
+                  <CanvasToolbar
+                    selectedCount={selectedCount}
+                    onLayoutVertical={handleLayoutVertical}
+                    onLayoutHorizontal={handleLayoutHorizontal}
+                    onLayoutByDependencyVertical={handleLayoutByDependencyVertical}
+                    onLayoutByDependencyHorizontal={handleLayoutByDependencyHorizontal}
+                    onAlignLeft={handleAlignLeft}
+                    onAlignTop={handleAlignTop}
+                    onZoomIn={handleZoomIn}
+                    onZoomOut={handleZoomOut}
+                    onZoomToFit={handleZoomToFit}
                   />
                 </div>
               </CanvasCellActionsContext.Provider>

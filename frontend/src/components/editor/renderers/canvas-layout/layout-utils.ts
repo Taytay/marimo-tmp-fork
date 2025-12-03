@@ -4,8 +4,46 @@ import { graphlib, layout } from "@dagrejs/dagre";
 import type { Editor, TLShapeId } from "tldraw";
 import type { CellId } from "@/core/cells/ids";
 import type { Variables } from "@/core/variables/types";
-import type { CellShape } from "./cell-shape-util";
 import { CELL_SPACING } from "./types";
+
+/**
+ * A cell-like shape with w/h props (supports both "cell" and "editable-cell" types)
+ */
+interface CellLikeShape {
+  id: TLShapeId;
+  type: string;
+  x: number;
+  y: number;
+  props: { w: number; h: number };
+}
+
+/**
+ * Type guard for cell-like shapes (both "cell" and "editable-cell")
+ */
+function isCellLikeShape(shape: unknown): shape is CellLikeShape {
+  return (
+    shape !== null &&
+    shape !== undefined &&
+    typeof shape === "object" &&
+    "type" in shape &&
+    "props" in shape &&
+    (shape.type === "cell" || shape.type === "editable-cell")
+  );
+}
+
+/**
+ * Get cell-like shapes from shape IDs, filtering out non-cell shapes.
+ */
+function getCellLikeShapes(editor: Editor, shapeIds: TLShapeId[]): CellLikeShape[] {
+  const result: CellLikeShape[] = [];
+  for (const id of shapeIds) {
+    const shape = editor.getShape(id);
+    if (isCellLikeShape(shape)) {
+      result.push(shape);
+    }
+  }
+  return result;
+}
 
 export type LayoutDirection = "TB" | "LR"; // Top-to-Bottom or Left-to-Right
 
@@ -246,14 +284,17 @@ export function layoutShapesByDependency(
     });
   }
 
-  // Batch update positions
+  // Batch update positions - detect shape type from existing shapes
   editor.updateShapes(
-    updates.map(({ id, x, y }) => ({
-      id,
-      type: "cell",
-      x,
-      y,
-    })),
+    updates.map(({ id, x, y }) => {
+      const shape = editor.getShape(id);
+      return {
+        id,
+        type: shape?.type || "cell",
+        x,
+        y,
+      };
+    }),
   );
 }
 
@@ -267,9 +308,7 @@ export function layoutShapesInGrid(
   columns = 3,
 ): void {
   // Get shapes with their current order
-  const shapes = shapeIds
-    .map((id) => editor.getShape(id))
-    .filter((s): s is CellShape => s !== undefined);
+  const shapes = getCellLikeShapes(editor, shapeIds);
 
   if (shapes.length === 0) {
     return;
@@ -306,14 +345,17 @@ export function layoutShapesInGrid(
     }
   }
 
-  // Batch update positions
+  // Batch update positions - detect shape type from existing shapes
   editor.updateShapes(
-    updates.map(({ id, x, y }) => ({
-      id,
-      type: "cell",
-      x,
-      y,
-    })),
+    updates.map(({ id, x, y }) => {
+      const shape = editor.getShape(id);
+      return {
+        id,
+        type: shape?.type || "cell",
+        x,
+        y,
+      };
+    }),
   );
 }
 
@@ -324,9 +366,7 @@ export function layoutShapesVertically(
   editor: Editor,
   shapeIds: TLShapeId[],
 ): void {
-  const shapes = shapeIds
-    .map((id) => editor.getShape(id))
-    .filter((s): s is CellShape => s !== undefined)
+  const shapes = getCellLikeShapes(editor, shapeIds)
     .sort((a, b) => a.y - b.y); // Maintain relative order
 
   if (shapes.length === 0) {
@@ -336,26 +376,20 @@ export function layoutShapesVertically(
   const minX = Math.min(...shapes.map((s) => s.x));
   const minY = Math.min(...shapes.map((s) => s.y));
 
-  const updates: { id: TLShapeId; x: number; y: number }[] = [];
+  const updates: { id: TLShapeId; type: string; x: number; y: number }[] = [];
   let currentY = minY;
 
   for (const shape of shapes) {
     updates.push({
       id: shape.id,
+      type: shape.type,
       x: minX,
       y: currentY,
     });
     currentY += shape.props.h + CELL_SPACING;
   }
 
-  editor.updateShapes(
-    updates.map(({ id, x, y }) => ({
-      id,
-      type: "cell",
-      x,
-      y,
-    })),
-  );
+  editor.updateShapes(updates);
 }
 
 /**
@@ -365,9 +399,7 @@ export function layoutShapesHorizontally(
   editor: Editor,
   shapeIds: TLShapeId[],
 ): void {
-  const shapes = shapeIds
-    .map((id) => editor.getShape(id))
-    .filter((s): s is CellShape => s !== undefined)
+  const shapes = getCellLikeShapes(editor, shapeIds)
     .sort((a, b) => a.x - b.x); // Maintain relative order
 
   if (shapes.length === 0) {
@@ -377,35 +409,27 @@ export function layoutShapesHorizontally(
   const minX = Math.min(...shapes.map((s) => s.x));
   const minY = Math.min(...shapes.map((s) => s.y));
 
-  const updates: { id: TLShapeId; x: number; y: number }[] = [];
+  const updates: { id: TLShapeId; type: string; x: number; y: number }[] = [];
   let currentX = minX;
 
   for (const shape of shapes) {
     updates.push({
       id: shape.id,
+      type: shape.type,
       x: currentX,
       y: minY,
     });
     currentX += shape.props.w + CELL_SPACING;
   }
 
-  editor.updateShapes(
-    updates.map(({ id, x, y }) => ({
-      id,
-      type: "cell",
-      x,
-      y,
-    })),
-  );
+  editor.updateShapes(updates);
 }
 
 /**
  * Align shapes to their left edges.
  */
 export function alignShapesLeft(editor: Editor, shapeIds: TLShapeId[]): void {
-  const shapes = shapeIds
-    .map((id) => editor.getShape(id))
-    .filter((s): s is CellShape => s !== undefined);
+  const shapes = getCellLikeShapes(editor, shapeIds);
 
   if (shapes.length === 0) {
     return;
@@ -416,7 +440,7 @@ export function alignShapesLeft(editor: Editor, shapeIds: TLShapeId[]): void {
   editor.updateShapes(
     shapes.map((shape) => ({
       id: shape.id,
-      type: "cell",
+      type: shape.type,
       x: minX,
     })),
   );
@@ -426,9 +450,7 @@ export function alignShapesLeft(editor: Editor, shapeIds: TLShapeId[]): void {
  * Align shapes to their top edges.
  */
 export function alignShapesTop(editor: Editor, shapeIds: TLShapeId[]): void {
-  const shapes = shapeIds
-    .map((id) => editor.getShape(id))
-    .filter((s): s is CellShape => s !== undefined);
+  const shapes = getCellLikeShapes(editor, shapeIds);
 
   if (shapes.length === 0) {
     return;
@@ -439,7 +461,7 @@ export function alignShapesTop(editor: Editor, shapeIds: TLShapeId[]): void {
   editor.updateShapes(
     shapes.map((shape) => ({
       id: shape.id,
-      type: "cell",
+      type: shape.type,
       y: minY,
     })),
   );

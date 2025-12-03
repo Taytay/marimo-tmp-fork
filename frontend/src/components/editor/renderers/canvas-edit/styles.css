@@ -64,3 +64,49 @@
 .canvas-edit-container [data-drag-handle] {
   z-index: 1000;
 }
+
+/*
+ * Arrow styling - marching animation on hover
+ * Note: Dashed style is set via TLDraw's dash prop on the arrow shape
+ */
+
+/* Marching ants animation keyframes */
+@keyframes marching-ants {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+/* Target SVG paths inside arrow shapes for animation */
+.canvas-edit-container .tl-shape[data-shape-type='arrow'] svg path {
+  transition: stroke-dashoffset 0.3s ease;
+}
+
+/* Animate arrows when the canvas has a hovered/selected cell */
+.canvas-edit-container.has-active-cell .tl-shape[data-shape-type='arrow'] svg path {
+  animation: marching-ants 1s linear infinite;
+}
+
+/* Also animate on direct arrow hover */
+.canvas-edit-container .tl-shape[data-shape-type='arrow']:hover svg path {
+  animation: marching-ants 0.5s linear infinite;
+}
+
+/*
+ * Arrow labels - hidden by default, shown when connected cells are active
+ */
+.canvas-edit-container .tl-shape[data-shape-type='arrow'] .tl-text-label {
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+  pointer-events: none;
+}
+
+/* Show labels when canvas has active cell */
+.canvas-edit-container.has-active-cell .tl-shape[data-shape-type='arrow'] .tl-text-label {
+  opacity: 1;
+}
+
+/* Show labels on direct arrow shape hover */
+.canvas-edit-container .tl-shape[data-shape-type='arrow']:hover .tl-text-label {
+  opacity: 1;
+}
